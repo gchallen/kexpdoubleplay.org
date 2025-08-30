@@ -41,4 +41,5 @@ export interface Config {
   scanIntervalMinutes: number;
   maxHoursPerRequest: number;
   apiPort: number;
+  historicalScanStopDate?: string;
 }
