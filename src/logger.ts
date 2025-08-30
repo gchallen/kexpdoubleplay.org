@@ -2,6 +2,7 @@ import winston from 'winston';
 
 // Check for --debug flag in command line arguments
 const debugMode = process.argv.includes('--debug');
+const progressMode = process.argv.includes('--progress');
 const logLevel = debugMode ? 'debug' : (process.env.LOG_LEVEL || 'info');
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
@@ -19,8 +20,9 @@ export const logger = winston.createLogger({
     version: '1.0.0'
   },
   transports: [
-    // Console output with color in development
+    // Console output with color in development (suppressed during progress mode)
     new winston.transports.Console({
+      silent: progressMode, // Suppress console logging when progress bars are active
       format: isDevelopment 
         ? winston.format.combine(
             winston.format.colorize(),
