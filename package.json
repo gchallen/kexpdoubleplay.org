@@ -11,7 +11,9 @@
     "test": "bun test",
     "test:jest": "jest",
     "test:watch": "jest --watch",
-    "test:coverage": "jest --coverage"
+    "test:coverage": "jest --coverage",
+    "test:github": "bun src/tests/test-github-setup.ts",
+    "test:backup": "bun src/tests/test-backup.ts"
   },
   "keywords": [],
   "author": "",
@@ -21,13 +23,16 @@
     "@types/express": "^5.0.3",
     "@types/moment-timezone": "^0.5.13",
     "@types/node": "^24.3.0",
+    "@types/node-cron": "^3.0.11",
     "chalk": "^5.6.0",
     "cli-progress": "^3.12.0",
+    "dotenv": "^17.2.1",
     "express": "^5.1.0",
     "http": "^0.0.1-security",
     "https": "^1.0.0",
     "moment": "^2.30.1",
     "moment-timezone": "^0.6.0",
+    "node-cron": "^4.2.1",
     "node-fetch": "^2.7.0",
     "winston": "^3.17.0"
   },
