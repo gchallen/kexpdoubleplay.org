@@ -10,6 +10,9 @@ export class KEXPApi {
   private showCache = new Map<number, any>();
   private httpAgent: http.Agent;
   private httpsAgent: https.Agent;
+  private consecutiveFailures = 0;
+  private lastFailureTime: number | null = null;
+  private isHealthy = true;
 
   constructor() {
     // Create HTTP agents with connection pooling and keep-alive
@@ -31,6 +34,18 @@ export class KEXPApi {
   }
 
   private async rateLimitedFetch(url: string): Promise<any> {
+    // Check if we need to apply exponential backoff
+    if (this.consecutiveFailures > 0 && this.lastFailureTime) {
+      const backoffDelay = this.calculateBackoffDelay();
+      const timeSinceFailure = Date.now() - this.lastFailureTime;
+      
+      if (timeSinceFailure < backoffDelay) {
+        const waitTime = backoffDelay - timeSinceFailure;
+        console.log(`API backoff: waiting ${Math.round(waitTime / 1000)}s before retry (${this.consecutiveFailures} consecutive failures)`);
+        await this.sleep(waitTime);
+      }
+    }
+    
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     
@@ -43,25 +58,56 @@ export class KEXPApi {
     // Determine which agent to use based on URL protocol
     const agent = url.startsWith('https:') ? this.httpsAgent : this.httpAgent;
     
-    const response = await fetch(url, {
-      agent: agent,
-      timeout: 30000, // 30 second request timeout
-      headers: {
-        'User-Agent': 'KEXP-DoublePlay-Scanner/1.0',
-        'Accept': 'application/json',
-        'Connection': 'keep-alive'
+    try {
+      const response = await fetch(url, {
+        agent: agent,
+        timeout: 30000, // 30 second request timeout
+        headers: {
+          'User-Agent': 'KEXP-DoublePlay-Scanner/1.0',
+          'Accept': 'application/json',
+          'Connection': 'keep-alive'
+        }
+      });
+      
+      if (!response.ok) {
+        throw new Error(`API request failed: ${response.status} ${response.statusText}`);
       }
-    });
-    
-    if (!response.ok) {
-      throw new Error(`API request failed: ${response.status} ${response.statusText}`);
+      
+      // Reset failure count on successful request
+      this.consecutiveFailures = 0;
+      this.lastFailureTime = null;
+      this.isHealthy = true;
+      
+      return response.json();
+    } catch (error) {
+      // Record the failure
+      this.consecutiveFailures++;
+      this.lastFailureTime = Date.now();
+      this.isHealthy = false;
+      
+      console.error(`KEXP API request failed (attempt ${this.consecutiveFailures}):`, error instanceof Error ? error.message : error);
+      throw error;
     }
-    
-    return response.json();
   }
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private calculateBackoffDelay(): number {
+    // Exponential backoff: min 5s, max 5 minutes
+    const baseDelay = 5000; // 5 seconds
+    const maxDelay = 300000; // 5 minutes
+    const exponentialDelay = baseDelay * Math.pow(2, Math.min(this.consecutiveFailures - 1, 6));
+    return Math.min(exponentialDelay, maxDelay);
+  }
+
+  getHealthStatus(): { isHealthy: boolean; consecutiveFailures: number; lastFailureTime: number | null } {
+    return {
+      isHealthy: this.isHealthy,
+      consecutiveFailures: this.consecutiveFailures,
+      lastFailureTime: this.lastFailureTime
+    };
   }
 
   private async getShowInfo(showId: number): Promise<any> {

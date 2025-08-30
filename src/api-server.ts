@@ -3,6 +3,7 @@ import moment from 'moment';
 import { Storage } from './storage';
 import { config } from './config';
 import { DoublePlayData } from './types';
+import { KEXPApi } from './api';
 
 export class ApiServer {
   private app: express.Application;
@@ -13,7 +14,7 @@ export class ApiServer {
   private scannerStatus: 'starting' | 'running' | 'stopped' | 'error' = 'starting';
   private lastError: string | null = null;
 
-  constructor(private port: number = 3000) {
+  constructor(private port: number = 3000, private api?: KEXPApi) {
     this.app = express();
     this.storage = new Storage(config.dataFilePath);
     this.scannerStartTime = new Date();
@@ -47,17 +48,38 @@ export class ApiServer {
         const data = await this.storage.load();
         const uptime = Date.now() - this.scannerStartTime.getTime();
         
+        // Get KEXP API health status
+        const apiHealthStatus = this.api?.getHealthStatus() || {
+          isHealthy: true,
+          consecutiveFailures: 0,
+          lastFailureTime: null
+        };
+        
+        // Determine retrieval status based on API health and scanner status
+        let retrievalStatus = 'running';
+        if (this.scannerStatus === 'error' || !apiHealthStatus.isHealthy) {
+          retrievalStatus = 'stopped';
+        } else if (this.scannerStatus === 'stopped') {
+          retrievalStatus = 'stopped';
+        }
+        
         const health = {
           status: this.scannerStatus,
           uptime: Math.floor(uptime / 1000), // seconds
           startTime: this.scannerStartTime.toISOString(),
           lastScanTime: this.lastScanTime?.toISOString() || null,
           lastError: this.lastError,
+          retrievalStatus,
           scanner: {
             earliestScanDate: data.startTime,
             latestScanDate: data.endTime,
             totalDoublePlays: data.doublePlays.length,
             dataFileExists: true
+          },
+          kexpApi: {
+            isHealthy: apiHealthStatus.isHealthy,
+            consecutiveFailures: apiHealthStatus.consecutiveFailures,
+            lastFailureTime: apiHealthStatus.lastFailureTime ? new Date(apiHealthStatus.lastFailureTime).toISOString() : null
           },
           api: {
             version: '1.0.0',
@@ -81,13 +103,34 @@ export class ApiServer {
       try {
         const data = await this.storage.load();
         
+        // Get KEXP API health status
+        const apiHealthStatus = this.api?.getHealthStatus() || {
+          isHealthy: true,
+          consecutiveFailures: 0,
+          lastFailureTime: null
+        };
+        
+        // Determine retrieval status
+        let retrievalStatus = 'running';
+        if (this.scannerStatus === 'error' || !apiHealthStatus.isHealthy) {
+          retrievalStatus = 'stopped';
+        } else if (this.scannerStatus === 'stopped') {
+          retrievalStatus = 'stopped';
+        }
+        
         res.json({
           startTime: data.startTime,
           endTime: data.endTime,
           totalCount: data.doublePlays.length,
+          retrievalStatus,
           doublePlays: data.doublePlays,
           metadata: {
             generatedAt: new Date().toISOString(),
+            retrievalStatus,
+            kexpApiHealth: {
+              isHealthy: apiHealthStatus.isHealthy,
+              consecutiveFailures: apiHealthStatus.consecutiveFailures
+            },
             timeRange: {
               earliest: data.startTime,
               latest: data.endTime,

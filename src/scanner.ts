@@ -32,7 +32,7 @@ export class Scanner {
     
     // Start API server
     const apiPort = parseInt(process.env.API_PORT || '3000', 10);
-    this.apiServer = new ApiServer(apiPort);
+    this.apiServer = new ApiServer(apiPort, this.api);
     await this.apiServer.start();
   }
 
@@ -128,6 +128,18 @@ export class Scanner {
         this.apiServer?.updateScannerStatus('running');
       } catch (error) {
         console.error(`Error scanning chunk: ${error}`);
+        
+        // Check if this is an API health issue
+        const healthStatus = this.api.getHealthStatus();
+        if (!healthStatus.isHealthy) {
+          this.apiServer?.updateScannerStatus('error', `KEXP API unavailable (${healthStatus.consecutiveFailures} consecutive failures)`);
+          
+          // If we have many failures, pause scanning for longer
+          if (healthStatus.consecutiveFailures >= 3) {
+            console.log(`Pausing scanning due to API failures. Will retry after backoff period.`);
+            // Don't break the loop, let the backoff mechanism handle retries
+          }
+        }
       }
     }
   }
@@ -144,9 +156,19 @@ export class Scanner {
       const lastEndTime = moment(this.data.endTime);
       
       if (lastEndTime.isBefore(now)) {
-        await this.scanRange(lastEndTime, now, 'forward');
-        this.data.endTime = now.toISOString();
-        await this.storage.save(this.data);
+        try {
+          await this.scanRange(lastEndTime, now, 'forward');
+          this.data.endTime = now.toISOString();
+          await this.storage.save(this.data);
+        } catch (error) {
+          console.error(`Error in periodic scan: ${error}`);
+          
+          // Check API health and update status accordingly
+          const healthStatus = this.api.getHealthStatus();
+          if (!healthStatus.isHealthy) {
+            this.apiServer?.updateScannerStatus('error', `KEXP API unavailable during periodic scan`);
+          }
+        }
       }
       
       if (this.isRunning) {
