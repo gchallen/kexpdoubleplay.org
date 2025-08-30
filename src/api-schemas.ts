@@ -4,7 +4,8 @@ import { z } from 'zod';
 export const PlaySchema = z.object({
   timestamp: z.string(),
   end_timestamp: z.string().optional(),
-  play_id: z.number()
+  play_id: z.number(),
+  duration: z.number().optional()
 });
 
 export const DoublePlaySchema = z.object({
@@ -13,7 +14,6 @@ export const DoublePlaySchema = z.object({
   plays: z.array(PlaySchema),
   dj: z.string().optional(),
   show: z.string().optional(),
-  duration: z.number().optional(),
   classification: z.enum(['legitimate', 'partial', 'mistake']).optional()
 });
 

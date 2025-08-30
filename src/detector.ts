@@ -61,10 +61,19 @@ export class DoublePlayDetector {
             endTimestamp = sortedPlays[playIndex + 1].airdate;
           }
           
+          // Calculate duration for this individual play
+          let duration: number | undefined;
+          if (endTimestamp) {
+            const startTime = new Date(play.airdate).getTime();
+            const endTime = new Date(endTimestamp).getTime();
+            duration = Math.round((endTime - startTime) / 1000);
+          }
+          
           return {
             timestamp: play.airdate,
             end_timestamp: endTimestamp,
-            play_id: play.play_id
+            play_id: play.play_id,
+            duration: duration
           };
         });
 
@@ -74,7 +83,7 @@ export class DoublePlayDetector {
           plays: plays,
           dj: enrichedFirstPlay.host?.name,
           show: enrichedFirstPlay.show?.name,
-          ...this.calculateDurationAndClassification(plays)
+          classification: this.calculateClassification(plays)
         };
         
         doublePlays.push(doublePlay);
@@ -120,10 +129,8 @@ export class DoublePlayDetector {
           merged[existingIndex].show = newPlay.show;
         }
         
-        // Recalculate duration and classification after merging plays
-        const mergedAnalysis = this.calculateDurationAndClassification(merged[existingIndex].plays);
-        merged[existingIndex].duration = mergedAnalysis.duration;
-        merged[existingIndex].classification = mergedAnalysis.classification;
+        // Recalculate classification after merging plays
+        merged[existingIndex].classification = this.calculateClassification(merged[existingIndex].plays);
       } else {
         merged.push(newPlay);
       }
@@ -141,19 +148,9 @@ export class DoublePlayDetector {
     return (dp1Start <= dp2End && dp1End >= dp2Start);
   }
 
-  private calculateDurationAndClassification(plays: Array<{timestamp: string; end_timestamp?: string; play_id: number}>): {duration?: number; classification?: 'legitimate' | 'partial' | 'mistake'} {
+  private calculateClassification(plays: Array<{timestamp: string; end_timestamp?: string; play_id: number; duration?: number}>): 'legitimate' | 'partial' | 'mistake' {
     if (plays.length < 2) {
-      return {};
-    }
-
-    // Calculate total duration from first play start to last play end
-    const firstStart = new Date(plays[0].timestamp).getTime();
-    const lastPlay = plays[plays.length - 1];
-    let totalDuration: number | undefined;
-
-    if (lastPlay.end_timestamp) {
-      const lastEnd = new Date(lastPlay.end_timestamp).getTime();
-      totalDuration = Math.round((lastEnd - firstStart) / 1000);
+      return 'legitimate';
     }
 
     // Calculate time between first two plays for fallback classification
@@ -161,53 +158,39 @@ export class DoublePlayDetector {
     const time2 = new Date(plays[1].timestamp).getTime();
     const timeBetweenSeconds = Math.round((time2 - time1) / 1000);
 
-    // Calculate individual song durations if end timestamps are available
-    const hasEndTimestamps = plays.every(play => play.end_timestamp);
-    let classification: 'legitimate' | 'partial' | 'mistake';
+    // Check if we have individual play durations
+    const hasPlayDurations = plays.every(play => play.duration !== undefined);
 
-    if (hasEndTimestamps) {
-      // With end timestamps, we can be more precise
-      const songDurations: number[] = [];
-      for (const play of plays) {
-        const startTime = new Date(play.timestamp).getTime();
-        const endTime = new Date(play.end_timestamp!).getTime();
-        const durationSeconds = Math.round((endTime - startTime) / 1000);
-        songDurations.push(durationSeconds);
-      }
-
-      const firstDuration = songDurations[0];
-      const secondDuration = songDurations[1];
+    if (hasPlayDurations) {
+      // With play durations, we can be more precise
+      const firstDuration = plays[0].duration!;
+      const secondDuration = plays[1].duration!;
 
       if (firstDuration < 30) {
         // Very short first play - likely a mistake
-        classification = 'mistake';
+        return 'mistake';
       } else if (firstDuration < 90) {
         // Short first play - likely partial
-        classification = 'partial';
+        return 'partial';
       } else if (Math.abs(firstDuration - secondDuration) > 60 && secondDuration < 90) {
         // Big difference in durations, second is short
-        classification = 'partial';
+        return 'partial';
       } else if (firstDuration >= 90 && secondDuration >= 90) {
         // Both plays are reasonably long
-        classification = 'legitimate';
+        return 'legitimate';
       } else {
         // Edge cases
-        classification = 'partial';
+        return 'partial';
       }
     } else {
-      // Fall back to old logic without end timestamps
+      // Fall back to old logic without individual play durations
       if (timeBetweenSeconds < 30) {
-        classification = 'mistake';
+        return 'mistake';
       } else if (timeBetweenSeconds < 60) {
-        classification = 'partial';
+        return 'partial';
       } else {
-        classification = 'legitimate';
+        return 'legitimate';
       }
     }
-
-    return {
-      duration: totalDuration,
-      classification: classification
-    };
   }
 }

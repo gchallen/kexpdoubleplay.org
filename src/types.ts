@@ -24,10 +24,10 @@ export interface DoublePlay {
     timestamp: string;
     end_timestamp?: string;  // End time when the song finished playing
     play_id: number;
+    duration?: number;  // Duration in seconds for this individual play
   }>;
   dj?: string;
   show?: string;
-  duration?: number;  // Duration in seconds between first play start and last play end
   classification?: 'legitimate' | 'partial' | 'mistake';  // Based on analysis of play patterns
 }
 
