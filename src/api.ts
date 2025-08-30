@@ -1,4 +1,6 @@
 import fetch from 'node-fetch';
+import * as http from 'http';
+import * as https from 'https';
 import moment from 'moment';
 import { KEXPPlay } from './types';
 import { config } from './config';
@@ -6,6 +8,27 @@ import { config } from './config';
 export class KEXPApi {
   private lastRequestTime = 0;
   private showCache = new Map<number, any>();
+  private httpAgent: http.Agent;
+  private httpsAgent: https.Agent;
+
+  constructor() {
+    // Create HTTP agents with connection pooling and keep-alive
+    this.httpAgent = new http.Agent({
+      keepAlive: true,
+      keepAliveMsecs: 30000, // Keep connections alive for 30 seconds
+      maxSockets: 10, // Max concurrent connections per host
+      maxFreeSockets: 5, // Max idle connections per host
+      timeout: 60000, // Socket timeout
+    });
+
+    this.httpsAgent = new https.Agent({
+      keepAlive: true,
+      keepAliveMsecs: 30000,
+      maxSockets: 10,
+      maxFreeSockets: 5,
+      timeout: 60000,
+    });
+  }
 
   private async rateLimitedFetch(url: string): Promise<any> {
     const now = Date.now();
@@ -17,7 +40,19 @@ export class KEXPApi {
     
     this.lastRequestTime = Date.now();
     
-    const response = await fetch(url);
+    // Determine which agent to use based on URL protocol
+    const agent = url.startsWith('https:') ? this.httpsAgent : this.httpAgent;
+    
+    const response = await fetch(url, {
+      agent: agent,
+      timeout: 30000, // 30 second request timeout
+      headers: {
+        'User-Agent': 'KEXP-DoublePlay-Scanner/1.0',
+        'Accept': 'application/json',
+        'Connection': 'keep-alive'
+      }
+    });
+    
     if (!response.ok) {
       throw new Error(`API request failed: ${response.status} ${response.statusText}`);
     }
@@ -126,5 +161,16 @@ export class KEXPApi {
       console.warn(`Failed to fetch show info for show ID ${play.show.id}:`, error);
       return play;
     }
+  }
+
+  /**
+   * Cleanup method to properly close HTTP agents and their connections
+   * Should be called when shutting down the application
+   */
+  destroy(): void {
+    this.httpAgent.destroy();
+    this.httpsAgent.destroy();
+    this.showCache.clear();
+    console.log('KEXP API client destroyed and connections closed');
   }
 }

@@ -41,6 +41,7 @@ export class Scanner {
 
   stop(): void {
     this.isRunning = false;
+    this.api.destroy(); // Cleanup HTTP connections
   }
 
   private async scanForward(): Promise<void> {

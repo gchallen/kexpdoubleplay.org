@@ -11,17 +11,15 @@ async function main() {
   try {
     await scanner.initialize();
     
-    process.on('SIGINT', () => {
+    const gracefulShutdown = () => {
       console.log('\nShutting down gracefully...');
       scanner.stop();
-      process.exit(0);
-    });
-    
-    process.on('SIGTERM', () => {
-      console.log('\nShutting down gracefully...');
-      scanner.stop();
-      process.exit(0);
-    });
+      // Give a moment for connections to close
+      setTimeout(() => process.exit(0), 1000);
+    };
+
+    process.on('SIGINT', gracefulShutdown);
+    process.on('SIGTERM', gracefulShutdown);
     
     await scanner.start();
     
