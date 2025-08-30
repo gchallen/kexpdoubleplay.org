@@ -138,7 +138,11 @@ export class KEXPApi {
     const maxRequests = 50; // Prevent infinite loops
     
     while (nextUrl && requestCount < maxRequests) {
-      console.log(`Fetching: ${nextUrl}`);
+      logger.debug('Fetching KEXP API page', {
+        url: nextUrl.substring(0, 100) + (nextUrl.length > 100 ? '...' : ''),
+        requestCount: requestCount + 1,
+        maxRequests
+      });
       const data = await this.rateLimitedFetch(nextUrl);
       requestCount++;
       
@@ -170,19 +174,22 @@ export class KEXPApi {
       
       // If we get the same URL back, break to avoid infinite loop
       if (nextUrl === currentUrl) {
-        console.log('Breaking due to identical next URL');
+        logger.debug('Breaking API pagination due to identical next URL');
         break;
       }
       
       // If no more results and we have a next URL, it might be empty pages
       if (!data.results || data.results.length === 0) {
-        console.log('Breaking due to empty results');
+        logger.debug('Breaking API pagination due to empty results');
         break;
       }
     }
     
     if (requestCount >= maxRequests) {
-      console.log(`Stopped fetching after ${maxRequests} requests to prevent infinite loop`);
+      logger.warn('Stopped API fetching to prevent infinite loop', {
+        maxRequests,
+        finalPlayCount: plays.length
+      });
     }
     
     return plays;
@@ -214,7 +221,10 @@ export class KEXPApi {
         } : undefined
       };
     } catch (error) {
-      console.warn(`Failed to fetch show info for show ID ${play.show.id}:`, error);
+      logger.debug('Failed to fetch show info', {
+        showId: play.show.id,
+        error: error instanceof Error ? error.message : error
+      });
       return play;
     }
   }
@@ -227,6 +237,6 @@ export class KEXPApi {
     this.httpAgent.destroy();
     this.httpsAgent.destroy();
     this.showCache.clear();
-    console.log('KEXP API client destroyed and connections closed');
+    logger.debug('KEXP API client destroyed and connections closed');
   }
 }

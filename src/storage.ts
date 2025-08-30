@@ -2,6 +2,7 @@ import * as fs from 'fs';
 import * as path from 'path';
 import { DoublePlayData } from './types';
 import moment from 'moment';
+import logger from './logger';
 
 export class Storage {
   constructor(private filePath: string) {}
@@ -13,7 +14,10 @@ export class Storage {
         return JSON.parse(data);
       }
     } catch (error) {
-      console.error('Error loading data file:', error);
+      logger.error('Error loading data file', {
+        filePath: this.filePath,
+        error: error instanceof Error ? error.message : error
+      });
     }
     
     return {
@@ -43,9 +47,15 @@ export class Storage {
         'utf-8'
       );
       
-      console.log(`Saved ${data.doublePlays.length} double plays to ${this.filePath}`);
+      logger.debug('Saved double plays data', {
+        count: data.doublePlays.length,
+        filePath: this.filePath
+      });
     } catch (error) {
-      console.error('Error saving data file:', error);
+      logger.error('Error saving data file', {
+        filePath: this.filePath,
+        error: error instanceof Error ? error.message : error
+      });
       throw error;
     }
   }

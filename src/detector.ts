@@ -1,5 +1,6 @@
 import { KEXPPlay, DoublePlay } from './types';
 import { KEXPApi } from './api';
+import logger from './logger';
 
 export class DoublePlayDetector {
   constructor(private api?: KEXPApi) {}
@@ -42,7 +43,11 @@ export class DoublePlayDetector {
           try {
             enrichedFirstPlay = await this.api.enrichPlayWithShowInfo(sameSongPlays[0]);
           } catch (error) {
-            console.warn('Failed to enrich play with show info:', error);
+            logger.debug('Failed to enrich play with show info', {
+              artist: sameSongPlays[0].artist,
+              song: sameSongPlays[0].song,
+              error: error instanceof Error ? error.message : error
+            });
           }
         }
         
