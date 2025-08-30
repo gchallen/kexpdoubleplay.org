@@ -7,6 +7,7 @@ import { Storage } from './storage';
 import { config } from './config';
 import { DoublePlayData } from './types';
 import { ApiServer } from './api-server';
+import { ScanQueue } from './scan-queue';
 import logger from './logger';
 
 export class Scanner {
@@ -16,13 +17,14 @@ export class Scanner {
   private data: DoublePlayData;
   private isRunning = false;
   private apiServer?: ApiServer;
+  private scanQueue?: ScanQueue;
 
   constructor() {
     this.api = new KEXPApi();
     this.detector = new DoublePlayDetector(this.api);
     this.storage = new Storage(config.dataFilePath);
     this.data = {
-      startTime: moment().subtract(1, 'day').toISOString(),
+      startTime: moment().subtract(7, 'days').toISOString(),
       endTime: moment().toISOString(),
       doublePlays: []
     };
@@ -54,11 +56,12 @@ export class Scanner {
     try {
       this.apiServer?.updateScannerStatus('running');
       
-      await this.scanForward();
+      // Initialize and start the scan queue
+      this.scanQueue = new ScanQueue(this.api, this.detector, this.storage, this.data);
+      this.scanQueue.start();
       
-      await this.scanBackward();
-      
-      this.schedulePeriodicScan();
+      console.log(chalk.dim(`\n⏰ Queue-based scanning started - forward scans every ${config.scanIntervalMinutes} minutes...\n`));
+      console.log(chalk.gray('────────────────────────────────────────'));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Scanner error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined });
@@ -68,8 +71,15 @@ export class Scanner {
   }
 
   stop(): void {
+    if (!this.isRunning) {
+      return; // Already stopped, prevent duplicate shutdown messages
+    }
+    
     this.isRunning = false;
     console.log(chalk.yellow('\n📴 Scanner stopping...'));
+    
+    // Stop the scan queue
+    this.scanQueue?.stop();
     
     // Print final summary
     const totalDoublePlays = this.data.doublePlays.length;
@@ -100,6 +110,7 @@ export class Scanner {
     console.log(chalk.green('\n✨ Scanner stopped cleanly\n'));
   }
 
+  /* DEPRECATED: Replaced by ScanQueue
   private async scanForward(): Promise<void> {
     const endTime = moment(this.data.endTime);
     const now = moment();
@@ -120,27 +131,80 @@ export class Scanner {
       logger.debug('Skipping forward scan - already up to date');
     }
   }
+  */
 
+  
+  /* DEPRECATED: Replaced by ScanQueue
   private async scanBackward(): Promise<void> {
-    const startTime = moment(this.data.startTime);
-    const targetTime = moment(this.data.startTime).subtract(7, 'days');
+    const stopDate = config.historicalScanStopDate ? moment(config.historicalScanStopDate) : null;
+    const stopText = stopDate ? `until ${stopDate.format('MMM DD, YYYY')}` : 'to find ALL double plays';
     
-    if (startTime.isAfter(targetTime)) {
-      const days = startTime.diff(targetTime, 'days');
-      console.log(chalk.blue(`📅 Backward scan: ${chalk.white(days)} days of history`));
-      await this.scanRange(targetTime, startTime, 'backward');
-      this.data.startTime = targetTime.toISOString();
-      await this.storage.save(this.data);
-    } else {
-      console.log(chalk.dim('✓ Historical scan complete'));
+    console.log(chalk.blue(`📅 Historical scan: Going back ${stopText}...`));
+    
+    let currentStartTime = moment(this.data.startTime);
+    let totalDaysScanned = 0;
+    let chunkCount = 0;
+    
+    while (this.isRunning) {
+      const targetTime = currentStartTime.clone().subtract(7, 'days');
+      chunkCount++;
+      
+      // Check if we've reached the configured stop date
+      if (stopDate && targetTime.isBefore(stopDate)) {
+        console.log(chalk.green(`\n🛑 Reached configured stop date: ${stopDate.format('MMM DD, YYYY')}`));
+        console.log(chalk.cyan(`   Total historical period: ${totalDaysScanned} days scanned`));
+        break;
+      }
+      
+      console.log(chalk.cyan(`\n📊 Chunk ${chunkCount}: ${targetTime.format('MMM DD, YYYY')} → ${currentStartTime.format('MMM DD, YYYY')}`));
+      
+      try {
+        // Scan this chunk for double plays with progress bar (handles hour-by-hour chunking)
+        await this.scanRange(targetTime, currentStartTime, 'backward');
+        
+        // Update our position
+        this.data.startTime = targetTime.toISOString();
+        await this.storage.save(this.data);
+        
+        // Move further back
+        const daysInChunk = currentStartTime.diff(targetTime, 'days');
+        totalDaysScanned += daysInChunk;
+        currentStartTime = targetTime;
+        
+        // Check if scanRange found any data - if scanRange processes 0 plays across all hours, 
+        // we've likely reached the beginning of KEXP data
+        // (We'll rely on the progress bar completion and empty results detection in scanRange)
+        
+      } catch (error) {
+        logger.error('Error during backward scan chunk', {
+          targetTime: targetTime.toISOString(),
+          currentStartTime: currentStartTime.toISOString(),
+          error: error instanceof Error ? error.message : error
+        });
+        
+        // Check if this is an API health issue
+        const healthStatus = this.api.getHealthStatus();
+        if (!healthStatus.isHealthy) {
+          console.log(chalk.yellow(`⚠️  API issues during historical scan - will resume when healthy`));
+          break; // Exit backward scan, let periodic scans handle retry
+        }
+        
+        // For other errors, continue with next chunk
+        currentStartTime = targetTime;
+      }
     }
+    
+    console.log(chalk.green(`\n✅ Historical scan complete! Scanned ${totalDaysScanned} days total`));
   }
+  */
 
+  /* DEPRECATED: Replaced by ScanQueue
   private async scanRange(
     startTime: moment.Moment, 
     endTime: moment.Moment, 
     direction: 'forward' | 'backward'
   ): Promise<void> {
+    console.log(chalk.magenta(`🔍 DEBUG: scanRange called - ${direction} from ${startTime.format('MMM DD HH:mm')} to ${endTime.format('MMM DD HH:mm')}`));
     const hourChunks: Array<{ start: moment.Moment; end: moment.Moment }> = [];
     
     let current = startTime.clone();
@@ -160,8 +224,12 @@ export class Scanner {
       format: `   ${chalk.cyan('{bar}')} {percentage}% | {value}/{total} chunks | {eta_formatted} remaining`,
       barCompleteChar: '█',
       barIncompleteChar: '░',
-      hideCursor: true
+      hideCursor: true,
+      clearOnComplete: false,
+      stopOnComplete: true
     }, cliProgress.Presets.shades_classic);
+    
+    console.log(chalk.dim(`   Processing ${chunks.length} hour-chunks...`));
     
     progressBar.start(chunks.length, 0);
     let processedChunks = 0;
@@ -264,7 +332,9 @@ export class Scanner {
     const timeRange = `${startTime.format('MMM DD')} - ${endTime.format('MMM DD')}`;
     console.log(chalk.green(`✓ Scan complete: ${timeRange} (${totalPlaysScanned.toLocaleString()} plays scanned)`));
   }
+  */
 
+  /* DEPRECATED: Replaced by ScanQueue
   private schedulePeriodicScan(): void {
     const intervalMs = config.scanIntervalMinutes * 60 * 1000;
     
@@ -308,4 +378,5 @@ export class Scanner {
     console.log(chalk.dim(`\n⏰ Monitoring every ${config.scanIntervalMinutes} minutes...\n`));
     console.log(chalk.gray('────────────────────────────────────────'));
   }
+  */
 }
