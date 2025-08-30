@@ -21,11 +21,19 @@ async function main() {
       process.exit(1);
     }
   }
+  
+  // Show debug mode status
+  const debugMode = process.argv.includes('--debug');
+  if (debugMode) {
+    console.log('🐛 Debug mode enabled - verbose logging active');
+  }
+  
   logger.info('KEXP Double Play Scanner starting', {
     nodeVersion: process.version,
     platform: process.platform,
     architecture: process.arch,
-    logLevel: process.env.LOG_LEVEL || 'info'
+    logLevel: debugMode ? 'debug' : (process.env.LOG_LEVEL || 'info'),
+    debugMode: debugMode
   });
   
   const scanner = new Scanner();

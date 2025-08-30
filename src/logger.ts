@@ -1,6 +1,8 @@
 import winston from 'winston';
 
-const logLevel = process.env.LOG_LEVEL || 'info';
+// Check for --debug flag in command line arguments
+const debugMode = process.argv.includes('--debug');
+const logLevel = debugMode ? 'debug' : (process.env.LOG_LEVEL || 'info');
 const isDevelopment = process.env.NODE_ENV !== 'production';
 
 export const logger = winston.createLogger({
@@ -24,7 +26,18 @@ export const logger = winston.createLogger({
             winston.format.colorize(),
             winston.format.simple(),
             winston.format.printf(({ timestamp, level, message, service, ...meta }) => {
-              const metaStr = Object.keys(meta).length ? ` ${JSON.stringify(meta)}` : '';
+              // Format metadata more readably, don't truncate
+              let metaStr = '';
+              if (Object.keys(meta).length) {
+                // Special handling for error metadata to make it more readable
+                const formattedMeta = { ...meta };
+                
+                // Don't show stack traces in console (they're in the log files)
+                delete formattedMeta.stack;
+                
+                // Format the metadata nicely
+                metaStr = ` ${JSON.stringify(formattedMeta, null, 0)}`;
+              }
               return `${timestamp} [${level}]: ${message}${metaStr}`;
             })
           )
