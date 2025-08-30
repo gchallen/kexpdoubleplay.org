@@ -130,7 +130,7 @@ export class ProgressMonitor {
       this.progressBar = undefined;
     }
     
-    console.log(`\n📅 New historical chunk: ${this.currentChunkStart.format('MMM DD HH:mm')} → ${this.currentChunkEnd.format('MMM DD HH:mm')}`);
+    console.log(`\n📅 New historical chunk: ${this.currentChunkStart.format('YYYY-MM-DD HH:mm')} → ${this.currentChunkEnd.format('YYYY-MM-DD HH:mm')}`);
     
     // Reinitialize progress bar after console output
     this.initializeProgressBar();
@@ -165,14 +165,14 @@ export class ProgressMonitor {
       action = 'Forward scan';
       const currentEnd = moment(this.data.endTime);
       const now = moment();
-      timeRange = `${currentEnd.format('MMM DD HH:mm')} → ${now.format('HH:mm')}`;
+      timeRange = `${currentEnd.format('YYYY-MM-DD HH:mm')} → ${now.format('YYYY-MM-DD HH:mm')}`;
       progressValue = 100;
       
     } else if (scannerState.currentScanType === 'backward' && this.currentChunkStart && this.currentChunkEnd) {
       // Backward scan: show chunk progress
       action = 'Historical scan';
-      const chunkStartTime = this.currentChunkStart.format('MMM DD HH:mm');
-      const chunkEndTime = this.currentChunkEnd.format('MMM DD HH:mm');
+      const chunkStartTime = this.currentChunkStart.format('YYYY-MM-DD HH:mm');
+      const chunkEndTime = this.currentChunkEnd.format('YYYY-MM-DD HH:mm');
       timeRange = `${chunkStartTime} → ${chunkEndTime}`;
       
       const chunkTotalHours = this.currentChunkEnd.diff(this.currentChunkStart, 'hours');
