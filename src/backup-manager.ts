@@ -100,6 +100,130 @@ export class BackupManager {
     }
   }
 
+  async loadBestBackup(): Promise<DoublePlayData | null> {
+    let bestBackup: DoublePlayData | null = null;
+    let backupSource = '';
+
+    // Try to load from GitHub backup first
+    if (this.isGitHubEnabled) {
+      try {
+        const githubBackup = await this.loadFromGitHub();
+        if (githubBackup) {
+          bestBackup = githubBackup;
+          backupSource = 'GitHub';
+        }
+      } catch (error) {
+        logger.warn('Failed to load GitHub backup', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    }
+
+    // Try to load from local backup if GitHub backup wasn't available or is older
+    if (this.isLocalEnabled && this.localBackupPath) {
+      try {
+        const localBackup = await this.loadFromLocalBackup();
+        if (localBackup) {
+          if (!bestBackup || this.compareBackups(localBackup, bestBackup) > 0) {
+            bestBackup = localBackup;
+            backupSource = 'local';
+          }
+        }
+      } catch (error) {
+        logger.warn('Failed to load local backup', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    }
+
+    if (bestBackup) {
+      logger.info('Loaded backup data successfully', {
+        source: backupSource,
+        doublePlaysCount: bestBackup.doublePlays.length,
+        dateRange: `${bestBackup.startTime} to ${bestBackup.endTime}`,
+        scanStats: bestBackup.scanStats ? {
+          totalApiRequests: bestBackup.scanStats.totalApiRequests,
+          totalScanTimeMs: bestBackup.scanStats.totalScanTimeMs
+        } : undefined
+      });
+    }
+
+    return bestBackup;
+  }
+
+  private async loadFromGitHub(): Promise<DoublePlayData | null> {
+    if (!this.githubToken || !this.githubOwner || !this.githubRepo) {
+      return null;
+    }
+
+    const apiUrl = `https://api.github.com/repos/${this.githubOwner}/${this.githubRepo}/contents/${this.githubFilePath}`;
+    
+    const response = await fetch(apiUrl, {
+      headers: {
+        'Authorization': `token ${this.githubToken}`,
+        'User-Agent': 'KEXP-DoublePlay-Scanner/1.0'
+      }
+    });
+
+    if (!response.ok) {
+      if (response.status === 404) {
+        logger.debug('No backup file found in GitHub repository');
+        return null;
+      }
+      throw new Error(`GitHub API error: ${response.status} ${response.statusText}`);
+    }
+
+    const fileData = await response.json() as GitHubFileResponse;
+    const content = Buffer.from(fileData.content, 'base64').toString('utf8');
+    
+    try {
+      return JSON.parse(content) as DoublePlayData;
+    } catch (error) {
+      throw new Error('Invalid JSON in GitHub backup file');
+    }
+  }
+
+  private async loadFromLocalBackup(): Promise<DoublePlayData | null> {
+    if (!this.localBackupPath || !fs.existsSync(this.localBackupPath)) {
+      return null;
+    }
+
+    try {
+      // Get the most recent local backup file
+      const files = fs.readdirSync(this.localBackupPath)
+        .filter(file => file.startsWith('double-plays-') && file.endsWith('.json'))
+        .map(file => ({
+          name: file,
+          path: path.join(this.localBackupPath!, file),
+          stats: fs.statSync(path.join(this.localBackupPath!, file))
+        }))
+        .sort((a, b) => b.stats.mtime.getTime() - a.stats.mtime.getTime());
+
+      if (files.length === 0) {
+        logger.debug('No local backup files found');
+        return null;
+      }
+
+      const mostRecentFile = files[0];
+      const content = fs.readFileSync(mostRecentFile.path, 'utf8');
+      
+      try {
+        return JSON.parse(content) as DoublePlayData;
+      } catch (error) {
+        throw new Error(`Invalid JSON in local backup file: ${mostRecentFile.name}`);
+      }
+    } catch (error) {
+      throw new Error(`Failed to read local backup: ${error instanceof Error ? error.message : error}`);
+    }
+  }
+
+  compareBackups(backup1: DoublePlayData, backup2: DoublePlayData): number {
+    // Compare by date range coverage (longer range is better)
+    const range1 = moment(backup1.endTime).diff(moment(backup1.startTime), 'hours');
+    const range2 = moment(backup2.endTime).diff(moment(backup2.startTime), 'hours');
+    return range1 - range2;
+  }
+
   async checkAndBackup(): Promise<void> {
     try {
       // Read current data

@@ -102,6 +102,30 @@ Environment variables are defined in `src/config.ts`:
 - System gracefully handles KEXP API outages without crashing
 - All timestamps are ISO 8601 UTC format
 
+## Data Recovery and Backup Loading
+
+The scanner automatically attempts to recover data from backups when starting:
+
+### Startup Data Loading Logic
+1. **Local file exists**: Uses local `double-plays.json` if available
+2. **Local file missing**: Automatically loads from backup (GitHub or local backup files)
+3. **Date range comparison**: Uses the dataset with the longer date range (more hours of coverage)
+4. **Fresh start**: Creates new data structure if no local file or backup exists
+
+### Command Line Flags
+- `--restart`: Skip backup loading and start fresh (ignores all backup data)
+- `--force-local`: Force use of local data only (ignore backups even if they have more data)
+- `--force-backup`: Force use of backup data only (ignore local file even if it exists)
+- `--progress`: Enable progress bar mode (suppresses console logging)
+- `--debug`: Enable verbose debug logging
+
+### Backup Data Sources (in priority order)
+1. **GitHub backup**: Latest commit in configured repository
+2. **Local backup files**: Most recent file in `LOCAL_BACKUP_PATH` directory
+3. **Fresh start**: New data structure with 7-day lookback window
+
+The scanner will automatically save recovered backup data to the local file for future use.
+
 ## Testing Real Data
 The integration test uses actual KEXP API data. Known double play for testing:
 - Artist: Pulp

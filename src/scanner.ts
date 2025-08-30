@@ -39,13 +39,126 @@ export class Scanner {
     };
   }
 
+  private compareDataSets(data1: DoublePlayData, data2: DoublePlayData): number {
+    // Compare by date range coverage (longer range is better)
+    const range1 = moment(data1.endTime).diff(moment(data1.startTime), 'hours');
+    const range2 = moment(data2.endTime).diff(moment(data2.startTime), 'hours');
+    return range1 - range2;
+  }
+
   async initialize(): Promise<void> {
-    this.data = await this.storage.load();
+    const hasRestartFlag = process.argv.includes('--restart');
+    const forceLocalFlag = process.argv.includes('--force-local');
+    const forceBackupFlag = process.argv.includes('--force-backup');
+    
+    // Initialize backup manager first
     await this.backupManager.initialize();
     
+    let localData: DoublePlayData | null = null;
+    let backupData: DoublePlayData | null = null;
+    let dataSource = '';
+    
+    // Try to load local data (unless --force-backup is set)
+    if (!forceBackupFlag) {
+      try {
+        localData = await this.storage.load();
+        dataSource = 'local file';
+      } catch (error) {
+        logger.debug('No local data file found or failed to load');
+      }
+    }
+    
+    // Try to load backup data (unless restart flag is set or --force-local is set)
+    if (!hasRestartFlag && !forceLocalFlag) {
+      try {
+        backupData = await this.backupManager.loadBestBackup();
+      } catch (error) {
+        logger.warn('Failed to load backup data', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    } else if (hasRestartFlag) {
+      logger.info('Restart flag detected - skipping backup loading');
+    } else if (forceLocalFlag) {
+      logger.info('Force local flag detected - using only local data');
+    }
+    
+    // Decide which data to use
+    if (forceLocalFlag && localData) {
+      // Force local flag - use local data only
+      this.data = localData;
+      dataSource = 'local file (forced)';
+      logger.info('Using local data - forced by --force-local flag');
+    } else if (forceBackupFlag && backupData) {
+      // Force backup flag - use backup data only
+      this.data = backupData;
+      dataSource = 'backup (forced)';
+      logger.info('Using backup data - forced by --force-backup flag');
+    } else if (!localData && backupData) {
+      // No local data, use backup
+      this.data = backupData;
+      dataSource = 'backup (local file missing)';
+      logger.info('Using backup data - local file not found');
+    } else if (localData && backupData) {
+      // Both available, compare by date range and use the one with longer range
+      const comparison = this.compareDataSets(backupData, localData);
+      if (comparison > 0) {
+        this.data = backupData;
+        dataSource = 'backup (longer date range than local)';
+        const backupRange = moment(backupData.endTime).diff(moment(backupData.startTime), 'hours');
+        const localRange = moment(localData.endTime).diff(moment(localData.startTime), 'hours');
+        logger.info('Using backup data - backup has longer date range than local file', {
+          backupRangeHours: backupRange,
+          localRangeHours: localRange,
+          backupRange: `${backupData.startTime} to ${backupData.endTime}`,
+          localRange: `${localData.startTime} to ${localData.endTime}`
+        });
+      } else {
+        this.data = localData;
+        dataSource = 'local file (longer or equal date range to backup)';
+      }
+    } else if (localData) {
+      // Only local data available
+      this.data = localData;
+      dataSource = 'local file';
+    } else if (backupData) {
+      // Only backup data available
+      this.data = backupData;
+      dataSource = 'backup (only source available)';
+      logger.info('Using backup data - only available source');
+    } else {
+      // No data available, start fresh
+      this.data = {
+        startTime: moment().subtract(7, 'days').toISOString(),
+        endTime: moment().toISOString(),
+        doublePlays: []
+      };
+      dataSource = 'fresh start (no existing data)';
+      logger.info('Starting with fresh data - no local file or backup found');
+    }
+    
     console.log(chalk.cyan('🎵 KEXP Double Play Scanner Initialized'));
+    console.log(`   Data source: ${chalk.blue(dataSource)}`);
     console.log(`   Data range: ${chalk.yellow(moment(this.data.startTime).format('MMM DD, YYYY HH:mm'))} → ${chalk.yellow(moment(this.data.endTime).format('MMM DD, YYYY HH:mm'))}`);
-    console.log(`   Existing double plays: ${chalk.green(this.data.doublePlays.length)}\n`);
+    console.log(`   Existing double plays: ${chalk.green(this.data.doublePlays.length)}`);
+    
+    if (this.data.scanStats) {
+      const totalHours = Math.round(this.data.scanStats.totalScanTimeMs / 1000 / 60 / 60 * 10) / 10;
+      console.log(`   Scan statistics: ${chalk.cyan(this.data.scanStats.totalApiRequests)} requests, ${chalk.cyan(totalHours)}h total scan time`);
+    }
+    console.log();
+    
+    // If we loaded data from backup, save it to local file immediately
+    if (dataSource.includes('backup')) {
+      try {
+        await this.storage.save(this.data);
+        logger.info('Backup data saved to local file for future use');
+      } catch (error) {
+        logger.warn('Failed to save backup data to local file', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    }
     
     logger.debug('Scanner initialized', {
       startTime: this.data.startTime,
