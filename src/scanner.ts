@@ -60,8 +60,7 @@ export class Scanner {
       this.scanQueue = new ScanQueue(this.api, this.detector, this.storage, this.data);
       this.scanQueue.start();
       
-      console.log(chalk.dim(`\n⏰ Queue-based scanning started - forward scans every ${config.scanIntervalMinutes} minutes...\n`));
-      console.log(chalk.gray('────────────────────────────────────────'));
+      console.log(chalk.dim(`⏰ Queue-based scanning started - forward scans every ${config.scanIntervalMinutes} minutes...`));
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
       logger.error('Scanner error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined });
