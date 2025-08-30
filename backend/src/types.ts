@@ -25,6 +25,7 @@ export interface DoublePlay {
     end_timestamp?: string;  // End time when the song finished playing
     play_id: number;
     duration?: number;  // Duration in seconds for this individual play
+    kexpPlay: KEXPPlay;  // Complete KEXP play object with all metadata
   }>;
   dj?: string;
   show?: string;

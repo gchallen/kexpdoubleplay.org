@@ -1,15 +1,27 @@
 # CLAUDE.md - Project Instructions for KEXP Double Play Scanner
 
 ## Project Overview
-This is a TypeScript application that monitors KEXP radio station's playlist to detect "double plays" - consecutive plays of the same song. The project uses bun as the runtime and package manager.
+This is a **multi-workspace project** consisting of a backend API service and a Next.js frontend for detecting and displaying KEXP radio double plays.
+
+### Workspace Structure
+- **`backend/`**: TypeScript scanner service + REST API (uses Bun runtime)
+- **`frontend/`**: Next.js React application with KEXP-style UI
 
 ## Key Technologies
-- **Runtime**: Bun (not Node.js/npm)
+
+### Backend
+- **Runtime**: Bun (not Node.js/npm)  
 - **Language**: TypeScript 5.x
 - **HTTP Client**: node-fetch with connection pooling
 - **Logging**: Winston with structured JSON logging
 - **Testing**: Bun's built-in test runner and Jest
 - **API**: Express.js REST server
+- **Containerization**: Docker with multi-platform support
+
+### Frontend  
+- **Framework**: Next.js 15
+- **Language**: TypeScript 5.x
+- **Deployment**: Optimized for Vercel
 
 ## Architecture Components
 
@@ -29,8 +41,11 @@ This is a TypeScript application that monitors KEXP radio station's playlist to 
 ## Development Guidelines
 
 ### Package Management
-- Always use `bun install`, `bun add`, `bun run` (never npm/yarn)
-- Dependencies are managed via bun.lock (not package-lock.json)
+- **Always use `bun install`, `bun add`, `bun dev`, `bun test`** (never npm/yarn)
+- **Pin all dependencies**: Use exact versions without ^ or ~ for reproducible builds
+- Dependencies managed via bun.lockb files in each workspace
+- **Root workspace**: `bun install` manages all workspaces
+- **Individual workspaces**: `cd backend && bun install` or `cd frontend && bun install`
 
 ### Code Standards
 - Replace any `console.log` with `logger.info/debug/warn/error`
@@ -39,17 +54,32 @@ This is a TypeScript application that monitors KEXP radio station's playlist to 
 - Follow existing TypeScript patterns and interfaces
 
 ### Configuration
-Environment variables are defined in `src/config.ts`:
-- `DATA_FILE_PATH`: JSON storage location
-- `API_PORT`: REST API server port  
+
+#### Backend
+Environment variables are defined in `backend/src/config.ts`:
+- `DATA_FILE_PATH`: JSON storage location (default: `./double-plays.json`)
+- `API_PORT`: REST API server port (default: `3000`)
 - `LOG_LEVEL`: Winston logging level
 - `RATE_LIMIT_DELAY`: API request throttling
 - `SCAN_INTERVAL_MINUTES`: Periodic scan frequency
 
+See `backend/BACKEND.md` for complete environment variable reference.
+
+#### Frontend
+Environment variables in `.env.local`:
+- `NEXT_PUBLIC_API_URL`: Backend API endpoint
+
 ### Testing
+
+#### Backend
 - Unit tests use Bun's built-in test runner (`bun test`)
 - Integration tests verify real KEXP API responses
 - Known test data: Pulp "Spike Island" double play on 2025-04-10
+- GitHub backup testing: `bun test:github`, `bun test:backup`
+
+#### Frontend
+- Next.js built-in testing with Jest and React Testing Library
+- Run tests with `bun test`
 
 ## Key Features to Preserve
 
@@ -76,24 +106,43 @@ Environment variables are defined in `src/config.ts`:
 
 ## Common Tasks
 
-### Adding New Features
-1. Update TypeScript interfaces in `src/types.ts` if needed
+### Backend Development
+#### Adding New Features
+1. Update TypeScript interfaces in `backend/src/types.ts` if needed
 2. Implement with proper logging using `logger` from `./logger`
 3. Add error handling with health status updates
 4. Update REST API endpoints if exposing new data
 5. Add tests using `bun test`
 
-### Debugging
+#### Debugging
 - Set `LOG_LEVEL=debug` for verbose logging
-- Check `logs/combined.log` for structured JSON logs
+- Check `backend/logs/combined.log` for structured JSON logs
 - Use `/api/health` endpoint to check system status
 - Monitor API health via `kexpApi` section in health response
 
-### Deployment
-- Build: `bun run build`
-- Logs directory created automatically
-- Monitor via `tail -f logs/combined.log`
+#### Deployment
+- Docker: `bun docker:build` and `bun docker:push`
+- Build: `bun build` (in backend directory)
+- Monitor via `tail -f backend/logs/combined.log`
 - Use health endpoints for uptime monitoring
+
+### Frontend Development
+#### Adding New Features
+1. Create components in `frontend/src/components/`
+2. Use Next.js App Router for routing
+3. Connect to backend API endpoints
+4. Follow KEXP design aesthetic (minimal, clean)
+5. Ensure mobile responsiveness
+
+#### Debugging
+- Use Next.js dev mode: `bun dev`
+- Browser dev tools for client-side debugging
+- Network tab to monitor API calls
+
+#### Deployment
+- Build: `bun build` (in frontend directory)
+- Optimized for Vercel deployment
+- Set `NEXT_PUBLIC_API_URL` environment variable
 
 ## Important Notes
 - Double plays are rare events - the JSON file won't grow large

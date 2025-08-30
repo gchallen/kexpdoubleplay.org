@@ -73,7 +73,8 @@ export class DoublePlayDetector {
             timestamp: play.airdate,
             end_timestamp: endTimestamp,
             play_id: play.play_id,
-            duration: duration
+            duration: duration,
+            kexpPlay: play  // Store the complete KEXP play object
           };
         });
 
@@ -98,7 +99,8 @@ export class DoublePlayDetector {
   
   private isSameSong(play1: KEXPPlay, play2: KEXPPlay): boolean {
     return play1.artist?.toLowerCase() === play2.artist?.toLowerCase() &&
-           play1.song?.toLowerCase() === play2.song?.toLowerCase();
+           play1.song?.toLowerCase() === play2.song?.toLowerCase() &&
+           play1.album?.toLowerCase() === play2.album?.toLowerCase();
   }
   
   mergeDoublePlays(existing: DoublePlay[], newPlays: DoublePlay[]): DoublePlay[] {
@@ -148,7 +150,7 @@ export class DoublePlayDetector {
     return (dp1Start <= dp2End && dp1End >= dp2Start);
   }
 
-  private calculateClassification(plays: Array<{timestamp: string; end_timestamp?: string; play_id: number; duration?: number}>): 'legitimate' | 'partial' | 'mistake' {
+  private calculateClassification(plays: Array<{timestamp: string; end_timestamp?: string; play_id: number; duration?: number; kexpPlay: KEXPPlay}>): 'legitimate' | 'partial' | 'mistake' {
     if (plays.length < 2) {
       return 'legitimate';
     }

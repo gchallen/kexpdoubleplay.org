@@ -1,11 +1,31 @@
 import { z } from 'zod';
 
 // Base schemas for common data structures
+export const KEXPPlaySchema = z.object({
+  airdate: z.string(),
+  artist: z.string(),
+  song: z.string(),
+  album: z.string().optional(),
+  play_id: z.number(),
+  play_type: z.string(),
+  image_uri: z.string().optional(),
+  thumbnail_uri: z.string().optional(),
+  show: z.object({
+    id: z.number(),
+    name: z.string()
+  }).optional(),
+  host: z.object({
+    id: z.number(),
+    name: z.string()
+  }).optional()
+});
+
 export const PlaySchema = z.object({
   timestamp: z.string(),
   end_timestamp: z.string().optional(),
   play_id: z.number(),
-  duration: z.number().optional()
+  duration: z.number().optional(),
+  kexpPlay: KEXPPlaySchema
 });
 
 export const DoublePlaySchema = z.object({

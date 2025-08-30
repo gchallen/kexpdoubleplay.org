@@ -1,19 +1,19 @@
-# GitHub Backup Setup Guide
+# KEXP Double Play Scanner Backend
 
-This guide explains how to set up GitHub backup for your KEXP Double Play data with a fine-grained personal access token.
+This document covers backend-specific configuration and setup for the KEXP Double Play Scanner.
 
-## Overview
+## GitHub Backup Setup Guide
 
 The GitHub backup system automatically commits your `double-plays.json` file to a private repository whenever the scanner discovers new data that expands the time range by ≥1 day.
 
-**Benefits:**
+### Benefits
 - ✅ **Reliable cloud storage** - GitHub has excellent uptime
 - ✅ **Built-in versioning** - Every backup is a git commit with history
 - ✅ **No token expiration issues** - Fine-grained tokens are long-lived
 - ✅ **Container-safe** - Token can be safely used in containers
 - ✅ **Free** - Private repositories are free on GitHub
 
-## Step 1: Create a Data Repository
+### Step 1: Create a Data Repository
 
 1. Go to https://github.com/new
 2. **Repository name:** `kexpdoubleplay-data` (or your preferred name)
@@ -22,7 +22,7 @@ The GitHub backup system automatically commits your `double-plays.json` file to 
 5. **Initialize:** Leave all checkboxes unchecked
 6. Click **"Create repository"**
 
-## Step 2: Create a Fine-Grained Personal Access Token
+### Step 2: Create a Fine-Grained Personal Access Token
 
 Fine-grained tokens are perfect for this use case because they:
 - Are repository-specific (more secure)
@@ -30,7 +30,7 @@ Fine-grained tokens are perfect for this use case because they:
 - Are safe to use in containers/environment variables
 - Don't expire frequently
 
-### Steps:
+#### Steps:
 
 1. **Go to GitHub Settings**
    - Click your profile picture → Settings
@@ -61,9 +61,9 @@ Fine-grained tokens are perfect for this use case because they:
    - **Copy the token immediately** (you won't see it again!)
    - Token format: `github_pat_11ABCD...`
 
-## Step 3: Configure Environment Variables
+### Step 3: Configure Environment Variables
 
-Add these to your `.env` file:
+Add these to your `.env` file in the backend directory:
 
 ```env
 # GitHub backup configuration
@@ -83,12 +83,12 @@ LOCAL_BACKUP_PATH=./backups
 - `GITHUB_REPO_NAME`: Repository name (e.g., `kexpdoubleplay-data`)
 - `GITHUB_FILE_PATH`: File path in repository (default: `double-plays.json`)
 
-## Step 4: Test the Setup
+### Step 4: Test the Setup
 
 Run the setup verification test:
 
 ```bash
-bun run test:github
+bun test:github
 ```
 
 This will:
@@ -126,17 +126,17 @@ Expected output:
 🎉 GitHub backup setup verified successfully!
 ```
 
-## Step 5: Test Backup Functionality
+### Step 5: Test Backup Functionality
 
 Run the backup functionality test:
 
 ```bash
-bun run test:backup
+bun test:backup
 ```
 
 This tests the complete backup workflow with your actual configuration.
 
-## Usage
+### Usage
 
 Once configured, the backup system works automatically:
 
@@ -148,7 +148,7 @@ Once configured, the backup system works automatically:
    Backup: 2025-08-30 14:23 (47 double plays, 156 API requests, 45s scan time)
    ```
 
-## Repository Structure
+### Repository Structure
 
 Your backup repository will look like:
 ```
@@ -157,19 +157,27 @@ kexpdoubleplay-data/
 └── .git/                      ← Git history with all backups
 ```
 
-## Viewing Your Data
+## Environment Variables Reference
 
-- **Current data:** View `double-plays.json` in your repository
-- **History:** Click "History" to see all backup commits
-- **Diff:** Click any commit to see what changed
-- **Download:** Use GitHub's download options for data export
+### Core Configuration
+| Variable | Default | Description |
+|----------|---------|-------------|
+| `DATA_FILE_PATH` | `./double-plays.json` | Path to store double play data |
+| `API_PORT` | `3000` | Port for REST API server |
+| `RATE_LIMIT_DELAY` | `1000` | Delay between API requests (ms) |
+| `SCAN_INTERVAL_MINUTES` | `5` | Periodic scan interval |
+| `MAX_HOURS_PER_REQUEST` | `1` | Max time range per API request |
+| `LOG_LEVEL` | `info` | Logging level (debug, info, warn, error) |
 
-## Security Notes
-
-✅ **Safe for containers:** Fine-grained tokens are designed for automation
-✅ **Limited scope:** Token only has access to your data repository  
-✅ **Private repository:** Data is not publicly accessible
-✅ **Granular permissions:** Only Contents read/write, nothing else
+### Backup Configuration
+| Variable | Required | Description | Example |
+|----------|----------|-------------|---------|
+| `GITHUB_BACKUP_ENABLED` | No | Enable/disable GitHub backup | `true` |
+| `GITHUB_TOKEN` | No | Fine-grained personal access token | `github_pat_11ABC...` |
+| `GITHUB_REPO_OWNER` | No | GitHub username/organization | `yourusername` |
+| `GITHUB_REPO_NAME` | No | Repository name | `kexpdoubleplay-data` |
+| `GITHUB_FILE_PATH` | No | File path in repo (default: `double-plays.json`) | `data/double-plays.json` |
+| `LOCAL_BACKUP_PATH` | No | Local backup directory (optional) | `./backups` |
 
 ## Troubleshooting
 
@@ -198,34 +206,18 @@ kexpdoubleplay-data/
 ### Test Commands
 ```bash
 # Test GitHub setup and permissions
-bun run test:github
+bun test:github
 
 # Test backup functionality  
-bun run test:backup
+bun test:backup
 
 # Check scanner logs
 tail -f logs/combined.log
 ```
 
-## Environment Variables Reference
+## Security Notes
 
-| Variable | Required | Description | Example |
-|----------|----------|-------------|---------|
-| `GITHUB_BACKUP_ENABLED` | Yes | Enable/disable GitHub backup | `true` |
-| `GITHUB_TOKEN` | Yes | Fine-grained personal access token | `github_pat_11ABC...` |
-| `GITHUB_REPO_OWNER` | Yes | GitHub username/organization | `yourusername` |
-| `GITHUB_REPO_NAME` | Yes | Repository name | `kexpdoubleplay-data` |
-| `GITHUB_FILE_PATH` | No | File path in repo (default: `double-plays.json`) | `data/double-plays.json` |
-| `LOCAL_BACKUP_PATH` | No | Local backup directory (optional) | `./backups` |
-
----
-
-## Next Steps
-
-Once GitHub backup is working:
-1. Your data is automatically backed up to the cloud
-2. You have full version history via Git commits
-3. You can browse/download your data anytime from GitHub
-4. The scanner will continue backing up as it discovers new double plays
-
-🎉 **Your KEXP double play data is now safely backed up to GitHub!**
+✅ **Safe for containers:** Fine-grained tokens are designed for automation
+✅ **Limited scope:** Token only has access to your data repository  
+✅ **Private repository:** Data is not publicly accessible
+✅ **Granular permissions:** Only Contents read/write, nothing else

@@ -1,12 +1,38 @@
+# Dependencies
 node_modules/
+*/node_modules/
+bun.lockb
+
+# Build outputs
 dist/
-coverage/
-*.log
+*/dist/
+.next/
+out/
+
+# Environment files
 .env
 .env.local
+.env.production.local
+
+# Logs
+*.log
+logs/
+*/logs/
+
+# Runtime data
+double-plays.json
+*/double-plays.json
+
+# Development files
 .DS_Store
 *.tmp
-bun.lockblogs/
+coverage/
+.nyc_output
+
+# IDE
+.vscode/
+.idea/
+
+# Backup and keys directories
 /keys
-/backups
-double-plays.json
+backend/backups
