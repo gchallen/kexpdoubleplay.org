@@ -58,6 +58,27 @@ export class ScanQueue {
   private startPeriodicForwardScans(): void {
     const intervalMs = config.scanIntervalMinutes * 60 * 1000;
     
+    logger.debug('Starting periodic forward scan timer', {
+      intervalMinutes: config.scanIntervalMinutes,
+      intervalMs: intervalMs
+    });
+    
+    // Queue an initial forward scan immediately if needed
+    const now = moment();
+    const lastEndTime = moment(this.data.endTime);
+    if (lastEndTime.isBefore(now)) {
+      logger.debug('Adding initial forward scan job', {
+        from: lastEndTime.toISOString(),
+        to: now.toISOString()
+      });
+      this.queue.unshift({
+        type: 'forward',
+        startTime: lastEndTime,
+        endTime: now
+      });
+      this.processQueue();
+    }
+    
     this.forwardScanTimer = setInterval(() => {
       if (!this.isRunning) return;
       
@@ -65,7 +86,7 @@ export class ScanQueue {
       const lastEndTime = moment(this.data.endTime);
       
       if (lastEndTime.isBefore(now)) {
-        logger.debug('Adding forward scan job', {
+        logger.debug('Adding periodic forward scan job', {
           from: lastEndTime.toISOString(),
           to: now.toISOString()
         });
@@ -85,7 +106,14 @@ export class ScanQueue {
 
   private enqueueInitialBackwardScan(): void {
     const startTime = moment(this.data.startTime);
+    // KEXP API only provides data for the last 365 days
     const stopDate = config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(365, 'days');
+    
+    logger.debug('Checking for initial backward scan', {
+      currentStartTime: startTime.toISOString(),
+      stopDate: stopDate.toISOString(),
+      needsBackwardScan: startTime.isAfter(stopDate)
+    });
     
     if (startTime.isAfter(stopDate)) {
       const backwardEnd = moment.max(startTime.clone().subtract(1, 'hour'), stopDate);
@@ -98,51 +126,97 @@ export class ScanQueue {
       
       logger.debug('Queued initial backward scan', {
         from: backwardEnd.toISOString(),
-        to: startTime.toISOString()
+        to: startTime.toISOString(),
+        queueLength: this.queue.length
       });
+    } else {
+      logger.debug('No backward scan needed - already reached stop date');
+      
+      // Show message to user when progress bar is enabled
+      if (process.argv.includes('--progress')) {
+        const daysSinceStopDate = moment().diff(stopDate, 'days');
+        console.log(`\n📊 Historical data limit reached (${stopDate.format('YYYY-MM-DD')})`);
+        console.log(`   KEXP API only provides ${daysSinceStopDate} days of historical data`);
+        console.log(`   No backward scans will be started\n`);
+      }
     }
   }
 
   private async processQueue(): Promise<void> {
     if (this.processing || !this.isRunning || this.queue.length === 0) {
+      logger.debug('ProcessQueue skipped', {
+        processing: this.processing,
+        isRunning: this.isRunning,
+        queueLength: this.queue.length
+      });
       return;
     }
 
     this.processing = true;
+    logger.debug('Processing queue started', { queueLength: this.queue.length });
 
     while (this.queue.length > 0 && this.isRunning) {
       const job = this.queue.shift()!;
       this.stateManager.setQueueLength(this.queue.length);
       
+      logger.debug('Processing job from queue', {
+        jobType: job.type,
+        timeRange: `${job.startTime.format('YYYY-MM-DD HH:mm')} → ${job.endTime.format('YYYY-MM-DD HH:mm')}`,
+        remainingInQueue: this.queue.length
+      });
+      
       try {
         await this.processJob(job);
       } catch (error) {
-        logger.error('Error processing scan job', {
-          jobType: job.type,
-          error: error instanceof Error ? error.message : error,
-          startTime: job.startTime.toISOString(),
-          endTime: job.endTime.toISOString()
-        });
+        const timeRange = `${job.startTime.format('YYYY-MM-DD HH:mm')} → ${job.endTime.format('YYYY-MM-DD HH:mm')}`;
         
         // Check if this is an API health issue
         const healthStatus = this.api.getHealthStatus();
         if (!healthStatus.isHealthy) {
-          logger.warn('API appears unhealthy, will retry job after exponential backoff');
+          // Only log after several retries to avoid breaking progress bar
+          if (this.stateManager.getState().currentRetryCount > 3) {
+            logger.warn('API request failed - will retry with exponential backoff', {
+              jobType: job.type,
+              timeRange: timeRange,
+              retryCount: this.stateManager.getState().currentRetryCount,
+              consecutiveFailures: healthStatus.consecutiveFailures,
+              errorMessage: error instanceof Error ? error.message : error,
+              willRetry: job.type === 'backward'
+            });
+          }
           
           // For backward scans, we can re-queue this job to try again later
           if (job.type === 'backward') {
+            const retryDelayMs = 5000 + (healthStatus.consecutiveFailures * 2000); // Increase delay with failures
+            // Only log at debug level to avoid console spam
+            if (this.stateManager.getState().currentRetryCount <= 3) {
+              logger.debug('Re-queueing backward scan job for retry', {
+                retryDelaySeconds: retryDelayMs / 1000,
+                timeRange: timeRange,
+                retryCount: this.stateManager.getState().currentRetryCount
+              });
+            }
+            
             // Add some delay and put job back at end of queue
             setTimeout(() => {
               if (this.isRunning) {
                 this.queue.push(job);
+                logger.debug('Backward scan job re-queued, resuming processing');
                 this.processQueue(); // Resume processing
               }
-            }, 5000); // 5 second delay before retry
+            }, retryDelayMs);
+          } else {
+            logger.warn('Forward scan failed - will retry on next scheduled interval', {
+              timeRange: timeRange
+            });
           }
         } else {
           // Non-API error - log and continue with next job
           logger.error('Non-API error in scan job, continuing with next job', {
-            error: error instanceof Error ? error.message : error
+            jobType: job.type,
+            timeRange: timeRange,
+            error: error instanceof Error ? error.message : error,
+            stack: error instanceof Error ? error.stack : undefined
           });
         }
       }
@@ -236,7 +310,8 @@ export class ScanQueue {
           error: error instanceof Error ? error.message : error,
           jobType: job.type,
           startTime: job.startTime.toISOString(),
-          endTime: chunkEnd.toISOString()
+          endTime: chunkEnd.toISOString(),
+          timeRange: `${job.startTime.format('YYYY-MM-DD HH:mm')} → ${chunkEnd.format('YYYY-MM-DD HH:mm')}`
         });
       }
       
@@ -276,6 +351,7 @@ export class ScanQueue {
 
   private enqueueNextBackwardScan(): void {
     const startTime = moment(this.data.startTime);
+    // KEXP API only provides data for the last 365 days
     const stopDate = config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(365, 'days');
     
     if (startTime.isAfter(stopDate)) {
@@ -297,6 +373,15 @@ export class ScanQueue {
       }
     } else {
       logger.info('Backward scan complete - reached historical scan stop date');
+      
+      // Show message to user when progress bar is enabled
+      if (process.argv.includes('--progress')) {
+        const daysSinceStopDate = moment().diff(stopDate, 'days');
+        console.log(`\n✅ Historical scanning complete!`);
+        console.log(`   Reached KEXP API data limit (${stopDate.format('YYYY-MM-DD')})`);
+        console.log(`   Scanned ${daysSinceStopDate} days of historical data`);
+        console.log(`   Continuing with forward scans only...\n`);
+      }
     }
   }
 }
