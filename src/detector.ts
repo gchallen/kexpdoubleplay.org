@@ -167,20 +167,21 @@ export class DoublePlayDetector {
       const secondDuration = plays[1].duration!;
 
       if (firstDuration < 30) {
-        // Very short first play - likely a mistake
+        // Very short first play - likely a mistake (accidental play)
         return 'mistake';
-      } else if (firstDuration < 90) {
-        // Short first play - likely partial
+      } 
+      
+      // Calculate percentage difference between durations
+      const maxDuration = Math.max(firstDuration, secondDuration);
+      const minDuration = Math.min(firstDuration, secondDuration);
+      const percentDifference = ((maxDuration - minDuration) / maxDuration) * 100;
+      
+      if (percentDifference > 10) {
+        // More than 10% difference in duration - likely a partial play that needed restart
         return 'partial';
-      } else if (Math.abs(firstDuration - secondDuration) > 60 && secondDuration < 90) {
-        // Big difference in durations, second is short
-        return 'partial';
-      } else if (firstDuration >= 90 && secondDuration >= 90) {
-        // Both plays are reasonably long
-        return 'legitimate';
       } else {
-        // Edge cases
-        return 'partial';
+        // Durations are within 10% of each other - legitimate double play
+        return 'legitimate';
       }
     } else {
       // Fall back to old logic without individual play durations
