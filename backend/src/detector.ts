@@ -1,10 +1,11 @@
 import { KEXPPlay, DoublePlay } from './types';
 import { KEXPApi } from './api';
 import logger from './logger';
+import moment from 'moment';
 
 export class DoublePlayDetector {
   constructor(private api?: KEXPApi) {}
-  async detectDoublePlays(plays: KEXPPlay[]): Promise<DoublePlay[]> {
+  async detectDoublePlays(plays: KEXPPlay[], chunkEndTime?: moment.Moment): Promise<DoublePlay[]> {
     const doublePlays: DoublePlay[] = [];
     const sortedPlays = [...plays].sort((a, b) => 
       new Date(a.airdate).getTime() - new Date(b.airdate).getTime()
@@ -51,7 +52,7 @@ export class DoublePlayDetector {
           }
         }
         
-        const plays = sameSongPlays.map((play, index) => {
+        const plays = await Promise.all(sameSongPlays.map(async (play, index) => {
           // Find the end timestamp by looking at the next item in the sorted plays
           const playIndex = sortedPlays.indexOf(play);
           let endTimestamp: string | undefined;
@@ -59,6 +60,34 @@ export class DoublePlayDetector {
           // Look for the next item after this play (could be trackplay or airbreak)
           if (playIndex < sortedPlays.length - 1) {
             endTimestamp = sortedPlays[playIndex + 1].airdate;
+          } else if (chunkEndTime && this.api) {
+            // This is the last play in the chunk - try to fetch additional data
+            try {
+              logger.debug('Fetching additional data for chunk boundary play', {
+                playId: play.play_id,
+                artist: play.artist,
+                song: play.song,
+                chunkEndTime: chunkEndTime.toISOString()
+              });
+              
+              const additionalPlays = await this.api.getAllPlays(
+                chunkEndTime, 
+                chunkEndTime.clone().add(10, 'minutes')
+              );
+              
+              if (additionalPlays.length > 0) {
+                endTimestamp = additionalPlays[0].airdate;
+                logger.debug('Found end timestamp from additional fetch', {
+                  playId: play.play_id,
+                  endTimestamp
+                });
+              }
+            } catch (error) {
+              logger.debug('Failed to fetch additional data for chunk boundary', {
+                playId: play.play_id,
+                error: error instanceof Error ? error.message : error
+              });
+            }
           }
           
           // Calculate duration for this individual play
@@ -67,6 +96,13 @@ export class DoublePlayDetector {
             const startTime = new Date(play.airdate).getTime();
             const endTime = new Date(endTimestamp).getTime();
             duration = Math.round((endTime - startTime) / 1000);
+          } else {
+            logger.debug('No end timestamp available for play at chunk boundary', {
+              playId: play.play_id,
+              artist: play.artist,
+              song: play.song,
+              note: 'Duration will remain undefined'
+            });
           }
           
           return {
@@ -76,7 +112,7 @@ export class DoublePlayDetector {
             duration: duration,
             kexpPlay: play  // Store the complete KEXP play object
           };
-        });
+        }));
 
         const doublePlay: DoublePlay = {
           artist: currentPlay.artist,

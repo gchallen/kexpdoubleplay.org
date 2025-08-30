@@ -302,11 +302,11 @@ export class ScanQueue {
     let newDoublePlays: any[] = [];
     
     try {
-      plays = await this.api.getPlays(job.startTime, chunkEnd);
+      plays = await this.api.getAllPlays(job.startTime, chunkEnd);
       this.stateManager.incrementRequests(); // Increment request counter
       this.stateManager.resetRetryCount(); // Reset retry count on successful request
       
-      newDoublePlays = await this.detector.detectDoublePlays(plays);
+      newDoublePlays = await this.detector.detectDoublePlays(plays, chunkEnd);
 
       if (newDoublePlays.length > 0) {
         this.data.doublePlays.push(...newDoublePlays);
