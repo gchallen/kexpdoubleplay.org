@@ -5,13 +5,12 @@ import { KEXPApi } from './api';
 import { DoublePlayDetector } from './detector';
 
 async function verifySpikeIsland() {
-  console.log('Verifying Spike Island - Pulp double play on 4/10/2025...\n');
-  console.log('Note: The date 4/10/2025 is in the future, so this test may not return actual data.\n');
+  console.log('Verifying Spike Island - Pulp double play on April 10, 2025...\n');
   
   const api = new KEXPApi();
   const detector = new DoublePlayDetector();
   
-  const centralTime = moment.tz('2024-04-10 10:08', 'YYYY-MM-DD HH:mm', 'America/Chicago');
+  const centralTime = moment.tz('2025-04-10 10:08', 'YYYY-MM-DD HH:mm', 'America/Chicago');
   const startTime = centralTime.clone().subtract(30, 'minutes');
   const endTime = centralTime.clone().add(30, 'minutes');
   
