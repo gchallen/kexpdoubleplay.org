@@ -63,6 +63,15 @@ export class KEXPApi {
     // Determine which agent to use based on URL protocol
     const agent = url.startsWith('https:') ? this.httpsAgent : this.httpAgent;
     
+    // Log the actual request being made
+    logger.debug('Making API request', {
+      url: url,
+      timeout: 30000,
+      method: 'GET'
+    });
+    
+    const requestStartTime = Date.now();
+    
     try {
       const response = await fetch(url, {
         agent: agent,
@@ -72,6 +81,14 @@ export class KEXPApi {
           'Accept': 'application/json',
           'Connection': 'keep-alive'
         }
+      });
+      
+      const requestDuration = Date.now() - requestStartTime;
+      logger.debug('API request completed', {
+        url: url,
+        statusCode: response.status,
+        durationMs: requestDuration,
+        ok: response.ok
       });
       
       if (!response.ok) {
@@ -90,12 +107,14 @@ export class KEXPApi {
       this.lastFailureTime = Date.now();
       this.isHealthy = false;
       
-      logger.error('KEXP API request failed', {
-        attempt: this.consecutiveFailures,
-        error: error instanceof Error ? error.message : error,
-        url: url, // Show full URL in error logs for debugging
-        stack: error instanceof Error ? error.stack : undefined
+      // Don't log here - let the scan-queue handle logging with retry counts
+      // Only log at debug level for troubleshooting
+      logger.debug('API request failed, will be retried', {
+        consecutiveFailures: this.consecutiveFailures,
+        nextRetryDelay: this.calculateBackoffDelay() / 1000,
+        errorType: error instanceof Error ? error.constructor.name : typeof error
       });
+      
       throw error;
     }
   }
