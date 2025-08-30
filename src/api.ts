@@ -31,10 +31,13 @@ export class KEXPApi {
   async getPlays(startTime: moment.Moment, endTime: moment.Moment): Promise<KEXPPlay[]> {
     const plays: KEXPPlay[] = [];
     let nextUrl: string | null = this.buildPlaylistUrl(startTime, endTime);
+    let requestCount = 0;
+    const maxRequests = 50; // Prevent infinite loops
     
-    while (nextUrl) {
+    while (nextUrl && requestCount < maxRequests) {
       console.log(`Fetching: ${nextUrl}`);
       const data = await this.rateLimitedFetch(nextUrl);
+      requestCount++;
       
       if (data.results) {
         for (const result of data.results) {
@@ -61,7 +64,25 @@ export class KEXPApi {
         }
       }
       
+      // Check for next page, but avoid infinite loops
+      const currentUrl = nextUrl;
       nextUrl = data.next || null;
+      
+      // If we get the same URL back, break to avoid infinite loop
+      if (nextUrl === currentUrl) {
+        console.log('Breaking due to identical next URL');
+        break;
+      }
+      
+      // If no more results and we have a next URL, it might be empty pages
+      if (!data.results || data.results.length === 0) {
+        console.log('Breaking due to empty results');
+        break;
+      }
+    }
+    
+    if (requestCount >= maxRequests) {
+      console.log(`Stopped fetching after ${maxRequests} requests to prevent infinite loop`);
     }
     
     return plays;
