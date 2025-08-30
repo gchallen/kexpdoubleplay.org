@@ -180,6 +180,21 @@ export class ScanQueue {
       } catch (error) {
         const timeRange = `${job.startTime.format('YYYY-MM-DD HH:mm')} → ${job.endTime.format('YYYY-MM-DD HH:mm')}`;
         
+        // Check if this is a data validation error
+        if (error instanceof Error && error.message.includes('Data validation failed')) {
+          logger.error('⚠️ CRITICAL: Data validation failed - scanner cannot save progress', {
+            jobType: job.type,
+            timeRange: timeRange,
+            error: error.message,
+            action: 'Scanner will continue but cannot save new double plays until schema is fixed',
+            suggestion: 'Check if types package needs rebuilding or if schema needs updating for null values'
+          });
+          
+          // Continue processing without crashing
+          this.stateManager.resetRetryCount();
+          continue;
+        }
+        
         // Check if this is an API health issue
         const healthStatus = this.api.getHealthStatus();
         if (!healthStatus.isHealthy) {
