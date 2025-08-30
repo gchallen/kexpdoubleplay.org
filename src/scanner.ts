@@ -4,6 +4,7 @@ import { DoublePlayDetector } from './detector';
 import { Storage } from './storage';
 import { config } from './config';
 import { DoublePlayData } from './types';
+import { ApiServer } from './api-server';
 
 export class Scanner {
   private api: KEXPApi;
@@ -11,6 +12,7 @@ export class Scanner {
   private storage: Storage;
   private data: DoublePlayData;
   private isRunning = false;
+  private apiServer?: ApiServer;
 
   constructor() {
     this.api = new KEXPApi();
@@ -27,21 +29,37 @@ export class Scanner {
     this.data = await this.storage.load();
     console.log(`Loaded data - Start: ${this.data.startTime}, End: ${this.data.endTime}`);
     console.log(`Found ${this.data.doublePlays.length} existing double plays`);
+    
+    // Start API server
+    const apiPort = parseInt(process.env.API_PORT || '3000', 10);
+    this.apiServer = new ApiServer(apiPort);
+    await this.apiServer.start();
   }
 
   async start(): Promise<void> {
     this.isRunning = true;
     
-    await this.scanForward();
-    
-    await this.scanBackward();
-    
-    this.schedulePeriodicScan();
+    try {
+      this.apiServer?.updateScannerStatus('running');
+      
+      await this.scanForward();
+      
+      await this.scanBackward();
+      
+      this.schedulePeriodicScan();
+    } catch (error) {
+      const errorMessage = error instanceof Error ? error.message : 'Unknown error';
+      console.error('Scanner error:', errorMessage);
+      this.apiServer?.updateScannerStatus('error', errorMessage);
+      throw error;
+    }
   }
 
   stop(): void {
     this.isRunning = false;
     this.api.destroy(); // Cleanup HTTP connections
+    this.apiServer?.updateScannerStatus('stopped');
+    this.apiServer?.stop(); // Stop API server
   }
 
   private async scanForward(): Promise<void> {
@@ -105,6 +123,9 @@ export class Scanner {
           );
           await this.storage.save(this.data);
         }
+        
+        // Update last scan time
+        this.apiServer?.updateScannerStatus('running');
       } catch (error) {
         console.error(`Error scanning chunk: ${error}`);
       }

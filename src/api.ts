@@ -109,7 +109,7 @@ export class KEXPApi {
       }
       
       // Check for next page, but avoid infinite loops
-      const currentUrl = nextUrl;
+      const currentUrl: string = nextUrl;
       nextUrl = data.next || null;
       
       // If we get the same URL back, break to avoid infinite loop

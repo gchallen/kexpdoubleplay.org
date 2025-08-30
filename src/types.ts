@@ -40,4 +40,5 @@ export interface Config {
   rateLimitDelay: number;
   scanIntervalMinutes: number;
   maxHoursPerRequest: number;
+  apiPort: number;
 }

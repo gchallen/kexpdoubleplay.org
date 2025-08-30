@@ -7,4 +7,5 @@ export const config: Config = {
   rateLimitDelay: parseInt(process.env.RATE_LIMIT_DELAY || '1000', 10),
   scanIntervalMinutes: parseInt(process.env.SCAN_INTERVAL_MINUTES || '5', 10),
   maxHoursPerRequest: parseInt(process.env.MAX_HOURS_PER_REQUEST || '1', 10),
+  apiPort: parseInt(process.env.API_PORT || '3000', 10),
 };
