@@ -11,7 +11,7 @@ export class DoublePlayDetector {
     while (i < sortedPlays.length) {
       const currentPlay = sortedPlays[i];
       
-      if (currentPlay.play_type !== 'track' || !currentPlay.artist || !currentPlay.song) {
+      if (currentPlay.play_type !== 'trackplay' || !currentPlay.artist || !currentPlay.song) {
         i++;
         continue;
       }
@@ -22,11 +22,11 @@ export class DoublePlayDetector {
       while (j < sortedPlays.length) {
         const nextPlay = sortedPlays[j];
         
-        if (nextPlay.play_type === 'track' && 
+        if (nextPlay.play_type === 'trackplay' && 
             this.isSameSong(currentPlay, nextPlay)) {
           sameSongPlays.push(nextPlay);
           j++;
-        } else if (nextPlay.play_type !== 'track') {
+        } else if (nextPlay.play_type !== 'trackplay') {
           j++;
         } else {
           break;

@@ -41,13 +41,13 @@ export class KEXPApi {
       
       if (data.results) {
         for (const result of data.results) {
-          if (result.play_type === 'track') {
+          if (result.play_type === 'trackplay') {
             plays.push({
               airdate: result.airdate,
               artist: result.artist || '',
               song: result.song || '',
               album: result.album,
-              play_id: result.play_id,
+              play_id: result.id,
               play_type: result.play_type,
               image_uri: result.image_uri,
               thumbnail_uri: result.thumbnail_uri,

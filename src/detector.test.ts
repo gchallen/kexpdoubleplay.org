@@ -16,7 +16,7 @@ describe('DoublePlayDetector', () => {
           artist: 'Test Artist',
           song: 'Test Song',
           play_id: 1,
-          play_type: 'track',
+          play_type: 'trackplay',
           host: { id: 1, name: 'DJ Test' },
           show: { id: 1, name: 'Morning Show' }
         },
@@ -25,7 +25,7 @@ describe('DoublePlayDetector', () => {
           artist: 'Test Artist',
           song: 'Test Song',
           play_id: 2,
-          play_type: 'track',
+          play_type: 'trackplay',
           host: { id: 1, name: 'DJ Test' },
           show: { id: 1, name: 'Morning Show' }
         }
@@ -48,7 +48,7 @@ describe('DoublePlayDetector', () => {
           artist: 'Test Artist',
           song: 'Test Song',
           play_id: 1,
-          play_type: 'track'
+          play_type: 'trackplay'
         },
         {
           airdate: '2025-04-10T10:10:00Z',
@@ -62,7 +62,7 @@ describe('DoublePlayDetector', () => {
           artist: 'Test Artist',
           song: 'Test Song',
           play_id: 3,
-          play_type: 'track'
+          play_type: 'trackplay'
         }
       ];
 
@@ -81,21 +81,21 @@ describe('DoublePlayDetector', () => {
           artist: 'Band',
           song: 'Hit',
           play_id: 1,
-          play_type: 'track'
+          play_type: 'trackplay'
         },
         {
           airdate: '2025-04-10T10:04:00Z',
           artist: 'Band',
           song: 'Hit',
           play_id: 2,
-          play_type: 'track'
+          play_type: 'trackplay'
         },
         {
           airdate: '2025-04-10T10:08:00Z',
           artist: 'Band',
           song: 'Hit',
           play_id: 3,
-          play_type: 'track'
+          play_type: 'trackplay'
         }
       ];
 
@@ -112,14 +112,14 @@ describe('DoublePlayDetector', () => {
           artist: 'Band',
           song: 'Song 1',
           play_id: 1,
-          play_type: 'track'
+          play_type: 'trackplay'
         },
         {
           airdate: '2025-04-10T10:04:00Z',
           artist: 'Band',
           song: 'Song 2',
           play_id: 2,
-          play_type: 'track'
+          play_type: 'trackplay'
         }
       ];
 
@@ -135,14 +135,14 @@ describe('DoublePlayDetector', () => {
           artist: 'The Band',
           song: 'Great Song',
           play_id: 1,
-          play_type: 'track'
+          play_type: 'trackplay'
         },
         {
           airdate: '2025-04-10T10:04:00Z',
           artist: 'THE BAND',
           song: 'GREAT SONG',
           play_id: 2,
-          play_type: 'track'
+          play_type: 'trackplay'
         }
       ];
 

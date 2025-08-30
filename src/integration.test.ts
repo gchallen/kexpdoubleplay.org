@@ -11,81 +11,67 @@ describe('Integration Tests', () => {
     detector = new DoublePlayDetector();
   });
 
-  it('should connect to KEXP API and detect double plays from real data', async () => {
-    // This test verifies that we can connect to the KEXP API and our double play detection works
-    // We'll test with a time window that's likely to have data
+  it('should detect the actual Pulp - Spike Island double play from April 10, 2025', async () => {
+    // This test fetches real data from KEXP API to verify the confirmed double play
+    // of "Spike Island" by Pulp that occurred on April 10, 2025 around 8:08 AM Pacific
+    // Play 1: 8:08:40 AM (ID: 3487084)
+    // Airbreak: 8:12:04 AM  
+    // Play 2: 8:13:44 AM (ID: 3487086)
     
-    console.log('Testing KEXP API connection and double play detection...');
+    console.log('Testing actual Pulp - Spike Island double play from April 10, 2025...');
     
-    // Try multiple recent time periods to find some data
-    const testPeriods = [
-      moment().subtract(1, 'hours'),
-      moment().subtract(6, 'hours'), 
-      moment().subtract(12, 'hours'),
-      moment().subtract(1, 'days'),
-      moment().subtract(2, 'days')
-    ];
+    // Query the specific time period where we know the double play occurred
+    const startTime = moment.tz('2025-04-10 08:00', 'YYYY-MM-DD HH:mm', 'America/Los_Angeles');
+    const endTime = moment.tz('2025-04-10 08:20', 'YYYY-MM-DD HH:mm', 'America/Los_Angeles');
     
-    let foundData = false;
-    let totalPlays = 0;
+    console.log(`Searching from ${startTime.format()} to ${endTime.format()} Pacific`);
     
-    for (const testTime of testPeriods) {
-      const startTime = testTime.clone().startOf('hour');
-      const endTime = startTime.clone().add(1, 'hour');
-      
-      console.log(`Trying period: ${startTime.format('YYYY-MM-DD HH:mm')} to ${endTime.format('YYYY-MM-DD HH:mm')}`);
-      
-      try {
-        const plays = await api.getPlays(startTime, endTime);
-        console.log(`Found ${plays.length} plays in this period`);
-        
-        if (plays.length > 0) {
-          foundData = true;
-          totalPlays += plays.length;
-          
-          // Test our double play detection on real data
-          const doublePlays = detector.detectDoublePlays(plays);
-          console.log(`Detected ${doublePlays.length} double plays`);
-          
-          if (doublePlays.length > 0) {
-            console.log('Double plays found:');
-            doublePlays.forEach((dp, i) => {
-              console.log(`  ${i + 1}. ${dp.artist} - ${dp.title} (${dp.plays.length} plays)`);
-            });
-          }
-          
-          // Show some sample tracks to verify API structure
-          const sampleTracks = plays.slice(0, 3);
-          console.log('Sample tracks:');
-          sampleTracks.forEach(track => {
-            console.log(`  - ${track.artist} - ${track.song}`);
-          });
-          
-          break; // Found data, no need to continue
-        }
-      } catch (error) {
-        console.log(`Error fetching data for ${startTime.format()}: ${error}`);
-      }
-    }
+    const plays = await api.getPlays(startTime, endTime);
+    console.log(`Found ${plays.length} total plays`);
+    
+    // Look for Pulp - Spike Island plays
+    const pulpPlays = plays.filter(p => 
+      p.artist?.toLowerCase() === 'pulp' &&
+      p.song?.toLowerCase() === 'spike island'
+    );
+    
+    console.log(`Found ${pulpPlays.length} Pulp - Spike Island plays:`);
+    pulpPlays.forEach(play => {
+      const playTime = moment(play.airdate).tz('America/Los_Angeles');
+      console.log(`  - ${play.artist} - ${play.song} at ${playTime.format('HH:mm:ss')} Pacific (ID: ${play.play_id})`);
+    });
+    
+    // Detect double plays from the data
+    const doublePlays = detector.detectDoublePlays(plays);
+    console.log(`Detected ${doublePlays.length} total double plays`);
+    
+    // Find the Pulp double play
+    const pulpDouble = doublePlays.find(dp => 
+      dp.artist.toLowerCase() === 'pulp' &&
+      dp.title.toLowerCase() === 'spike island'
+    );
     
     // Assertions
-    if (!foundData) {
-      console.log('⚠ No data found from KEXP API in any test periods');
-      console.log('This could indicate:');
-      console.log('1. API is down or has changed');
-      console.log('2. Authentication is required');
-      console.log('3. Rate limiting is preventing access');
-      console.log('4. Data retention policies have changed');
+    expect(pulpPlays.length).toBeGreaterThanOrEqual(2);
+    expect(pulpDouble).toBeDefined();
+    
+    if (pulpDouble) {
+      expect(pulpDouble.plays.length).toBeGreaterThanOrEqual(2);
+      console.log(`✓ Confirmed double play: ${pulpDouble.artist} - ${pulpDouble.title}`);
+      console.log(`  Played ${pulpDouble.plays.length} times`);
+      console.log(`  DJ: ${pulpDouble.dj || 'Unknown'}`);
+      console.log(`  Show: ${pulpDouble.show || 'Unknown'}`);
       
-      // For now, we'll make this a soft failure - the important thing is that
-      // our code structure is correct and would work with real data
-      expect(true).toBe(true); // Always pass for now
-      return;
+      pulpDouble.plays.forEach((play, i) => {
+        const playTime = moment(play.timestamp).tz('America/Los_Angeles');
+        console.log(`    Play ${i + 1}: ${playTime.format('HH:mm:ss')} Pacific`);
+      });
+      
+      // Verify this matches the known play IDs we discovered
+      const playIds = pulpDouble.plays.map(p => p.play_id);
+      console.log(`  Play IDs: ${playIds.join(', ')}`);
     }
     
-    // If we found data, verify our API client and detector work
-    expect(totalPlays).toBeGreaterThan(0);
-    console.log(`✓ Successfully fetched ${totalPlays} plays from KEXP API`);
-    console.log('✓ Double play detection algorithm executed successfully on real data');
-  }, 60000); // 60 second timeout for multiple API attempts
+    console.log('✓ Successfully validated real KEXP double play data!');
+  }, 30000); // 30 second timeout
 });

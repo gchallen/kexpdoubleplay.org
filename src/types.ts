@@ -4,7 +4,7 @@ export interface KEXPPlay {
   song: string;
   album?: string;
   play_id: number;
-  play_type: string;
+  play_type: 'trackplay' | 'airbreak' | string;
   image_uri?: string;
   thumbnail_uri?: string;
   show?: {
