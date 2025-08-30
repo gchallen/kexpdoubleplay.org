@@ -5,6 +5,7 @@ import { config } from './config';
 
 export class KEXPApi {
   private lastRequestTime = 0;
+  private showCache = new Map<number, any>();
 
   private async rateLimitedFetch(url: string): Promise<any> {
     const now = Date.now();
@@ -26,6 +27,17 @@ export class KEXPApi {
 
   private sleep(ms: number): Promise<void> {
     return new Promise(resolve => setTimeout(resolve, ms));
+  }
+
+  private async getShowInfo(showId: number): Promise<any> {
+    if (this.showCache.has(showId)) {
+      return this.showCache.get(showId);
+    }
+    
+    const showUrl = `${config.apiBaseUrl}/shows/${showId}/`;
+    const showData = await this.rateLimitedFetch(showUrl);
+    this.showCache.set(showId, showData);
+    return showData;
   }
 
   async getPlays(startTime: moment.Moment, endTime: moment.Moment): Promise<KEXPPlay[]> {
@@ -52,13 +64,10 @@ export class KEXPApi {
               image_uri: result.image_uri,
               thumbnail_uri: result.thumbnail_uri,
               show: result.show ? {
-                id: result.show.id,
-                name: result.show.name
+                id: result.show,
+                name: 'Unknown Show' // Will be filled in later if needed
               } : undefined,
-              host: result.host ? {
-                id: result.host.id,
-                name: result.host.name
-              } : undefined
+              host: undefined // Will be filled in later if needed
             });
           }
         }
@@ -93,5 +102,29 @@ export class KEXPApi {
     const end = endTime.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     
     return `${config.apiBaseUrl}/plays/?airdate_after=${start}&airdate_before=${end}&ordering=airdate`;
+  }
+
+  async enrichPlayWithShowInfo(play: KEXPPlay): Promise<KEXPPlay> {
+    if (!play.show?.id) {
+      return play;
+    }
+
+    try {
+      const showInfo = await this.getShowInfo(play.show.id);
+      return {
+        ...play,
+        show: {
+          id: play.show.id,
+          name: showInfo.program_name || 'Unknown Show'
+        },
+        host: showInfo && showInfo.host_names && showInfo.host_names.length > 0 ? {
+          id: showInfo.hosts?.[0] || 0,
+          name: showInfo.host_names[0]
+        } : undefined
+      };
+    } catch (error) {
+      console.warn(`Failed to fetch show info for show ID ${play.show.id}:`, error);
+      return play;
+    }
   }
 }

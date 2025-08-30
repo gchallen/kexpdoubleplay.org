@@ -9,7 +9,7 @@ describe('DoublePlayDetector', () => {
   });
 
   describe('detectDoublePlays', () => {
-    it('should detect a simple double play', () => {
+    it('should detect a simple double play', async () => {
       const plays: KEXPPlay[] = [
         {
           airdate: '2025-04-10T15:08:00Z',
@@ -31,7 +31,7 @@ describe('DoublePlayDetector', () => {
         }
       ];
 
-      const doublePlays = detector.detectDoublePlays(plays);
+      const doublePlays = await detector.detectDoublePlays(plays);
 
       expect(doublePlays).toHaveLength(1);
       expect(doublePlays[0].artist).toBe('Test Artist');
@@ -41,7 +41,7 @@ describe('DoublePlayDetector', () => {
       expect(doublePlays[0].show).toBe('Morning Show');
     });
 
-    it('should detect double play with air break in between', () => {
+    it('should detect double play with air break in between', async () => {
       const plays: KEXPPlay[] = [
         {
           airdate: '2025-04-10T10:08:00Z',
@@ -66,7 +66,7 @@ describe('DoublePlayDetector', () => {
         }
       ];
 
-      const doublePlays = detector.detectDoublePlays(plays);
+      const doublePlays = await detector.detectDoublePlays(plays);
 
       expect(doublePlays).toHaveLength(1);
       expect(doublePlays[0].plays).toHaveLength(2);
@@ -74,7 +74,7 @@ describe('DoublePlayDetector', () => {
       expect(doublePlays[0].plays[1].play_id).toBe(3);
     });
 
-    it('should detect triple play', () => {
+    it('should detect triple play', async () => {
       const plays: KEXPPlay[] = [
         {
           airdate: '2025-04-10T10:00:00Z',
@@ -99,13 +99,13 @@ describe('DoublePlayDetector', () => {
         }
       ];
 
-      const doublePlays = detector.detectDoublePlays(plays);
+      const doublePlays = await detector.detectDoublePlays(plays);
 
       expect(doublePlays).toHaveLength(1);
       expect(doublePlays[0].plays).toHaveLength(3);
     });
 
-    it('should not detect double play when different songs', () => {
+    it('should not detect double play when different songs', async () => {
       const plays: KEXPPlay[] = [
         {
           airdate: '2025-04-10T10:00:00Z',
@@ -123,12 +123,12 @@ describe('DoublePlayDetector', () => {
         }
       ];
 
-      const doublePlays = detector.detectDoublePlays(plays);
+      const doublePlays = await detector.detectDoublePlays(plays);
 
       expect(doublePlays).toHaveLength(0);
     });
 
-    it('should handle case-insensitive matching', () => {
+    it('should handle case-insensitive matching', async () => {
       const plays: KEXPPlay[] = [
         {
           airdate: '2025-04-10T10:00:00Z',
@@ -146,7 +146,7 @@ describe('DoublePlayDetector', () => {
         }
       ];
 
-      const doublePlays = detector.detectDoublePlays(plays);
+      const doublePlays = await detector.detectDoublePlays(plays);
 
       expect(doublePlays).toHaveLength(1);
       expect(doublePlays[0].plays).toHaveLength(2);
@@ -154,7 +154,7 @@ describe('DoublePlayDetector', () => {
   });
 
   describe('mergeDoublePlays', () => {
-    it('should merge overlapping double plays', () => {
+    it('should merge overlapping double plays', async () => {
       const existing: DoublePlay[] = [
         {
           artist: 'Band',
@@ -184,7 +184,7 @@ describe('DoublePlayDetector', () => {
       expect(merged[0].plays.map(p => p.play_id)).toEqual([1, 2, 3]);
     });
 
-    it('should not merge non-overlapping double plays', () => {
+    it('should not merge non-overlapping double plays', async () => {
       const existing: DoublePlay[] = [
         {
           artist: 'Band',
@@ -212,7 +212,7 @@ describe('DoublePlayDetector', () => {
       expect(merged).toHaveLength(2);
     });
 
-    it('should add DJ and show info when missing', () => {
+    it('should add DJ and show info when missing', async () => {
       const existing: DoublePlay[] = [
         {
           artist: 'Band',

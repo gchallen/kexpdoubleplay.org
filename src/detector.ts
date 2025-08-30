@@ -1,7 +1,9 @@
 import { KEXPPlay, DoublePlay } from './types';
+import { KEXPApi } from './api';
 
 export class DoublePlayDetector {
-  detectDoublePlays(plays: KEXPPlay[]): DoublePlay[] {
+  constructor(private api?: KEXPApi) {}
+  async detectDoublePlays(plays: KEXPPlay[]): Promise<DoublePlay[]> {
     const doublePlays: DoublePlay[] = [];
     const sortedPlays = [...plays].sort((a, b) => 
       new Date(a.airdate).getTime() - new Date(b.airdate).getTime()
@@ -34,6 +36,16 @@ export class DoublePlayDetector {
       }
       
       if (sameSongPlays.length >= 2) {
+        // Enrich the first play with detailed show information only when we detect a double play
+        let enrichedFirstPlay = sameSongPlays[0];
+        if (this.api) {
+          try {
+            enrichedFirstPlay = await this.api.enrichPlayWithShowInfo(sameSongPlays[0]);
+          } catch (error) {
+            console.warn('Failed to enrich play with show info:', error);
+          }
+        }
+        
         const doublePlay: DoublePlay = {
           artist: currentPlay.artist,
           title: currentPlay.song,
@@ -41,8 +53,8 @@ export class DoublePlayDetector {
             timestamp: play.airdate,
             play_id: play.play_id
           })),
-          dj: sameSongPlays[0].host?.name,
-          show: sameSongPlays[0].show?.name
+          dj: enrichedFirstPlay.host?.name,
+          show: enrichedFirstPlay.show?.name
         };
         
         doublePlays.push(doublePlay);

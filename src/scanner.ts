@@ -14,7 +14,7 @@ export class Scanner {
 
   constructor() {
     this.api = new KEXPApi();
-    this.detector = new DoublePlayDetector();
+    this.detector = new DoublePlayDetector(this.api);
     this.storage = new Storage(config.dataFilePath);
     this.data = {
       startTime: moment().subtract(1, 'day').toISOString(),
@@ -95,7 +95,7 @@ export class Scanner {
         const plays = await this.api.getPlays(chunk.start, chunk.end);
         console.log(`Found ${plays.length} plays`);
         
-        const newDoublePlays = this.detector.detectDoublePlays(plays);
+        const newDoublePlays = await this.detector.detectDoublePlays(plays);
         if (newDoublePlays.length > 0) {
           console.log(`Detected ${newDoublePlays.length} double plays`);
           this.data.doublePlays = this.detector.mergeDoublePlays(

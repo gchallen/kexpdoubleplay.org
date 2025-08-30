@@ -8,7 +8,7 @@ describe('Integration Tests', () => {
 
   beforeEach(() => {
     api = new KEXPApi();
-    detector = new DoublePlayDetector();
+    detector = new DoublePlayDetector(api);
   });
 
   it('should detect the actual Pulp - Spike Island double play from April 10, 2025', async () => {
@@ -42,7 +42,7 @@ describe('Integration Tests', () => {
     });
     
     // Detect double plays from the data
-    const doublePlays = detector.detectDoublePlays(plays);
+    const doublePlays = await detector.detectDoublePlays(plays);
     console.log(`Detected ${doublePlays.length} total double plays`);
     
     // Find the Pulp double play
