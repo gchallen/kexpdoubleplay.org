@@ -135,16 +135,14 @@ export class KEXPApi {
     const plays: KEXPPlay[] = [];
     let nextUrl: string | null = this.buildPlaylistUrl(startTime, endTime);
     let requestCount = 0;
-    const maxRequests = 50; // Prevent infinite loops
     
-    while (nextUrl && requestCount < maxRequests) {
+    while (nextUrl) {
+      requestCount++;
       logger.debug('Fetching KEXP API page', {
         url: nextUrl.substring(0, 100) + (nextUrl.length > 100 ? '...' : ''),
-        requestCount: requestCount + 1,
-        maxRequests
+        requestCount
       });
       const data = await this.rateLimitedFetch(nextUrl);
-      requestCount++;
       
       if (data.results) {
         for (const result of data.results) {
@@ -185,12 +183,11 @@ export class KEXPApi {
       }
     }
     
-    if (requestCount >= maxRequests) {
-      logger.warn('Stopped API fetching to prevent infinite loop', {
-        maxRequests,
-        finalPlayCount: plays.length
-      });
-    }
+    logger.debug('Completed API pagination', {
+      totalRequests: requestCount,
+      finalPlayCount: plays.length,
+      timeRange: `${startTime.format('YYYY-MM-DD HH:mm')} → ${endTime.format('YYYY-MM-DD HH:mm')}`
+    });
     
     return plays;
   }
