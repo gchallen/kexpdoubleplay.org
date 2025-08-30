@@ -27,6 +27,8 @@ export interface DoublePlay {
   }>;
   dj?: string;
   show?: string;
+  duration?: number;  // Duration in seconds between first play start and last play end
+  classification?: 'legitimate' | 'partial' | 'mistake';  // Based on analysis of play patterns
 }
 
 export interface ScanStats {

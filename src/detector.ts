@@ -51,27 +51,30 @@ export class DoublePlayDetector {
           }
         }
         
+        const plays = sameSongPlays.map((play, index) => {
+          // Find the end timestamp by looking at the next item in the sorted plays
+          const playIndex = sortedPlays.indexOf(play);
+          let endTimestamp: string | undefined;
+          
+          // Look for the next item after this play (could be trackplay or airbreak)
+          if (playIndex < sortedPlays.length - 1) {
+            endTimestamp = sortedPlays[playIndex + 1].airdate;
+          }
+          
+          return {
+            timestamp: play.airdate,
+            end_timestamp: endTimestamp,
+            play_id: play.play_id
+          };
+        });
+
         const doublePlay: DoublePlay = {
           artist: currentPlay.artist,
           title: currentPlay.song,
-          plays: sameSongPlays.map((play, index) => {
-            // Find the end timestamp by looking at the next item in the sorted plays
-            const playIndex = sortedPlays.indexOf(play);
-            let endTimestamp: string | undefined;
-            
-            // Look for the next item after this play (could be trackplay or airbreak)
-            if (playIndex < sortedPlays.length - 1) {
-              endTimestamp = sortedPlays[playIndex + 1].airdate;
-            }
-            
-            return {
-              timestamp: play.airdate,
-              end_timestamp: endTimestamp,
-              play_id: play.play_id
-            };
-          }),
+          plays: plays,
           dj: enrichedFirstPlay.host?.name,
-          show: enrichedFirstPlay.show?.name
+          show: enrichedFirstPlay.show?.name,
+          ...this.calculateDurationAndClassification(plays)
         };
         
         doublePlays.push(doublePlay);
@@ -116,6 +119,11 @@ export class DoublePlayDetector {
         if (!merged[existingIndex].show && newPlay.show) {
           merged[existingIndex].show = newPlay.show;
         }
+        
+        // Recalculate duration and classification after merging plays
+        const mergedAnalysis = this.calculateDurationAndClassification(merged[existingIndex].plays);
+        merged[existingIndex].duration = mergedAnalysis.duration;
+        merged[existingIndex].classification = mergedAnalysis.classification;
       } else {
         merged.push(newPlay);
       }
@@ -131,5 +139,75 @@ export class DoublePlayDetector {
     const dp2End = new Date(dp2.plays[dp2.plays.length - 1].timestamp).getTime();
     
     return (dp1Start <= dp2End && dp1End >= dp2Start);
+  }
+
+  private calculateDurationAndClassification(plays: Array<{timestamp: string; end_timestamp?: string; play_id: number}>): {duration?: number; classification?: 'legitimate' | 'partial' | 'mistake'} {
+    if (plays.length < 2) {
+      return {};
+    }
+
+    // Calculate total duration from first play start to last play end
+    const firstStart = new Date(plays[0].timestamp).getTime();
+    const lastPlay = plays[plays.length - 1];
+    let totalDuration: number | undefined;
+
+    if (lastPlay.end_timestamp) {
+      const lastEnd = new Date(lastPlay.end_timestamp).getTime();
+      totalDuration = Math.round((lastEnd - firstStart) / 1000);
+    }
+
+    // Calculate time between first two plays for fallback classification
+    const time1 = new Date(plays[0].timestamp).getTime();
+    const time2 = new Date(plays[1].timestamp).getTime();
+    const timeBetweenSeconds = Math.round((time2 - time1) / 1000);
+
+    // Calculate individual song durations if end timestamps are available
+    const hasEndTimestamps = plays.every(play => play.end_timestamp);
+    let classification: 'legitimate' | 'partial' | 'mistake';
+
+    if (hasEndTimestamps) {
+      // With end timestamps, we can be more precise
+      const songDurations: number[] = [];
+      for (const play of plays) {
+        const startTime = new Date(play.timestamp).getTime();
+        const endTime = new Date(play.end_timestamp!).getTime();
+        const durationSeconds = Math.round((endTime - startTime) / 1000);
+        songDurations.push(durationSeconds);
+      }
+
+      const firstDuration = songDurations[0];
+      const secondDuration = songDurations[1];
+
+      if (firstDuration < 30) {
+        // Very short first play - likely a mistake
+        classification = 'mistake';
+      } else if (firstDuration < 90) {
+        // Short first play - likely partial
+        classification = 'partial';
+      } else if (Math.abs(firstDuration - secondDuration) > 60 && secondDuration < 90) {
+        // Big difference in durations, second is short
+        classification = 'partial';
+      } else if (firstDuration >= 90 && secondDuration >= 90) {
+        // Both plays are reasonably long
+        classification = 'legitimate';
+      } else {
+        // Edge cases
+        classification = 'partial';
+      }
+    } else {
+      // Fall back to old logic without end timestamps
+      if (timeBetweenSeconds < 30) {
+        classification = 'mistake';
+      } else if (timeBetweenSeconds < 60) {
+        classification = 'partial';
+      } else {
+        classification = 'legitimate';
+      }
+    }
+
+    return {
+      duration: totalDuration,
+      classification: classification
+    };
   }
 }
