@@ -1,9 +1,11 @@
 import express from 'express';
 import moment from 'moment';
+import * as os from 'os';
 import { Storage } from './storage';
 import { config } from './config';
 import { DoublePlayData } from './types';
 import { KEXPApi } from './api';
+import logger from './logger';
 
 export class ApiServer {
   private app: express.Application;
@@ -36,7 +38,12 @@ export class ApiServer {
 
     // Request logging
     this.app.use((req, res, next) => {
-      console.log(`${new Date().toISOString()} ${req.method} ${req.path}`);
+      logger.debug('HTTP request', {
+        method: req.method,
+        path: req.path,
+        userAgent: req.get('User-Agent'),
+        ip: req.ip
+      });
       next();
     });
   }
@@ -63,6 +70,11 @@ export class ApiServer {
           retrievalStatus = 'stopped';
         }
         
+        // Get system information
+        const memoryUsage = process.memoryUsage();
+        const totalScanDays = moment(data.endTime).diff(moment(data.startTime), 'days');
+        const avgDoublePlaysPerDay = totalScanDays > 0 ? (data.doublePlays.length / totalScanDays).toFixed(2) : '0.00';
+        
         const health = {
           status: this.scannerStatus,
           uptime: Math.floor(uptime / 1000), // seconds
@@ -74,12 +86,27 @@ export class ApiServer {
             earliestScanDate: data.startTime,
             latestScanDate: data.endTime,
             totalDoublePlays: data.doublePlays.length,
+            scanDuration: totalScanDays,
+            avgDoublePlaysPerDay: parseFloat(avgDoublePlaysPerDay),
             dataFileExists: true
           },
           kexpApi: {
             isHealthy: apiHealthStatus.isHealthy,
             consecutiveFailures: apiHealthStatus.consecutiveFailures,
             lastFailureTime: apiHealthStatus.lastFailureTime ? new Date(apiHealthStatus.lastFailureTime).toISOString() : null
+          },
+          system: {
+            nodeVersion: process.version,
+            platform: process.platform,
+            architecture: process.arch,
+            memoryUsage: {
+              rss: Math.round(memoryUsage.rss / 1024 / 1024), // MB
+              heapUsed: Math.round(memoryUsage.heapUsed / 1024 / 1024), // MB
+              heapTotal: Math.round(memoryUsage.heapTotal / 1024 / 1024), // MB
+              external: Math.round(memoryUsage.external / 1024 / 1024) // MB
+            },
+            loadAverage: process.platform !== 'win32' ? os.loadavg() : null,
+            cpuCount: os.cpus().length
           },
           api: {
             version: '1.0.0',
@@ -282,9 +309,11 @@ export class ApiServer {
   start(): Promise<void> {
     return new Promise((resolve) => {
       this.server = this.app.listen(this.port, () => {
-        console.log(`🚀 API Server running on http://localhost:${this.port}`);
-        console.log(`📊 Health check: http://localhost:${this.port}/api/health`);
-        console.log(`📋 All endpoints: http://localhost:${this.port}/api`);
+        logger.info('API Server started', {
+          port: this.port,
+          healthEndpoint: `http://localhost:${this.port}/api/health`,
+          docsEndpoint: `http://localhost:${this.port}/api`
+        });
         this.scannerStatus = 'running';
         resolve();
       });
@@ -294,7 +323,7 @@ export class ApiServer {
   stop(): void {
     if (this.server) {
       this.server.close();
-      console.log('API Server stopped');
+      logger.info('API Server stopped');
     }
   }
 }

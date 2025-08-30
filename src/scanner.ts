@@ -5,6 +5,7 @@ import { Storage } from './storage';
 import { config } from './config';
 import { DoublePlayData } from './types';
 import { ApiServer } from './api-server';
+import logger from './logger';
 
 export class Scanner {
   private api: KEXPApi;
@@ -27,13 +28,17 @@ export class Scanner {
 
   async initialize(): Promise<void> {
     this.data = await this.storage.load();
-    console.log(`Loaded data - Start: ${this.data.startTime}, End: ${this.data.endTime}`);
-    console.log(`Found ${this.data.doublePlays.length} existing double plays`);
+    logger.info('Scanner initialized', {
+      startTime: this.data.startTime,
+      endTime: this.data.endTime,
+      existingDoublePlays: this.data.doublePlays.length
+    });
     
     // Start API server
     const apiPort = parseInt(process.env.API_PORT || '3000', 10);
     this.apiServer = new ApiServer(apiPort, this.api);
     await this.apiServer.start();
+    logger.info('API server started', { port: apiPort });
   }
 
   async start(): Promise<void> {
@@ -49,7 +54,7 @@ export class Scanner {
       this.schedulePeriodicScan();
     } catch (error) {
       const errorMessage = error instanceof Error ? error.message : 'Unknown error';
-      console.error('Scanner error:', errorMessage);
+      logger.error('Scanner error', { error: errorMessage, stack: error instanceof Error ? error.stack : undefined });
       this.apiServer?.updateScannerStatus('error', errorMessage);
       throw error;
     }
@@ -57,20 +62,28 @@ export class Scanner {
 
   stop(): void {
     this.isRunning = false;
+    logger.info('Scanner stopping', { reason: 'Manual stop requested' });
     this.api.destroy(); // Cleanup HTTP connections
     this.apiServer?.updateScannerStatus('stopped');
     this.apiServer?.stop(); // Stop API server
+    logger.info('Scanner stopped successfully');
   }
 
   private async scanForward(): Promise<void> {
-    console.log('Starting forward scan from end time...');
     const endTime = moment(this.data.endTime);
     const now = moment();
     
     if (endTime.isBefore(now)) {
+      logger.info('Starting forward scan', { 
+        from: endTime.toISOString(), 
+        to: now.toISOString(),
+        durationHours: now.diff(endTime, 'hours', true)
+      });
       await this.scanRange(endTime, now, 'forward');
       this.data.endTime = now.toISOString();
       await this.storage.save(this.data);
+    } else {
+      logger.debug('Skipping forward scan - already up to date');
     }
   }
 
@@ -108,15 +121,22 @@ export class Scanner {
     for (const chunk of chunks) {
       if (!this.isRunning) break;
       
-      console.log(`Scanning ${chunk.start.format('YYYY-MM-DD HH:mm')} to ${chunk.end.format('YYYY-MM-DD HH:mm')}`);
+      logger.debug('Scanning chunk', {
+        start: chunk.start.toISOString(),
+        end: chunk.end.toISOString(),
+        direction
+      });
       
       try {
         const plays = await this.api.getPlays(chunk.start, chunk.end);
-        console.log(`Found ${plays.length} plays`);
+        logger.debug('Retrieved plays', { count: plays.length });
         
         const newDoublePlays = await this.detector.detectDoublePlays(plays);
         if (newDoublePlays.length > 0) {
-          console.log(`Detected ${newDoublePlays.length} double plays`);
+          logger.info('Double plays detected!', { 
+            count: newDoublePlays.length,
+            plays: newDoublePlays.map(dp => `${dp.artist} - ${dp.title}`)
+          });
           this.data.doublePlays = this.detector.mergeDoublePlays(
             this.data.doublePlays,
             newDoublePlays
@@ -127,16 +147,24 @@ export class Scanner {
         // Update last scan time
         this.apiServer?.updateScannerStatus('running');
       } catch (error) {
-        console.error(`Error scanning chunk: ${error}`);
+        const healthStatus = this.api.getHealthStatus();
+        logger.warn('Chunk scan failed', {
+          error: error instanceof Error ? error.message : error,
+          chunkStart: chunk.start.toISOString(),
+          chunkEnd: chunk.end.toISOString(),
+          apiHealthy: healthStatus.isHealthy,
+          consecutiveFailures: healthStatus.consecutiveFailures
+        });
         
         // Check if this is an API health issue
-        const healthStatus = this.api.getHealthStatus();
         if (!healthStatus.isHealthy) {
           this.apiServer?.updateScannerStatus('error', `KEXP API unavailable (${healthStatus.consecutiveFailures} consecutive failures)`);
           
           // If we have many failures, pause scanning for longer
           if (healthStatus.consecutiveFailures >= 3) {
-            console.log(`Pausing scanning due to API failures. Will retry after backoff period.`);
+            logger.warn('API in degraded state, relying on exponential backoff', {
+              consecutiveFailures: healthStatus.consecutiveFailures
+            });
             // Don't break the loop, let the backoff mechanism handle retries
           }
         }

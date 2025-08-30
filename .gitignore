@@ -7,4 +7,4 @@ coverage/
 .DS_Store
 double-plays.json
 *.tmp
-bun.lockb
+bun.lockblogs/

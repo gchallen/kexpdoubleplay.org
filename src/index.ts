@@ -1,32 +1,49 @@
 #!/usr/bin/env node
 
 import { Scanner } from './scanner';
+import logger from './logger';
 
 async function main() {
-  console.log('KEXP Double Play Scanner');
-  console.log('========================');
+  logger.info('KEXP Double Play Scanner starting', {
+    nodeVersion: process.version,
+    platform: process.platform,
+    architecture: process.arch,
+    logLevel: process.env.LOG_LEVEL || 'info'
+  });
   
   const scanner = new Scanner();
   
   try {
     await scanner.initialize();
     
-    const gracefulShutdown = () => {
-      console.log('\nShutting down gracefully...');
+    const gracefulShutdown = (signal: string) => {
+      logger.info('Graceful shutdown initiated', { signal });
       scanner.stop();
       // Give a moment for connections to close
-      setTimeout(() => process.exit(0), 1000);
+      setTimeout(() => {
+        logger.info('Process exiting');
+        process.exit(0);
+      }, 1000);
     };
 
-    process.on('SIGINT', gracefulShutdown);
-    process.on('SIGTERM', gracefulShutdown);
+    process.on('SIGINT', () => gracefulShutdown('SIGINT'));
+    process.on('SIGTERM', () => gracefulShutdown('SIGTERM'));
     
     await scanner.start();
     
   } catch (error) {
-    console.error('Fatal error:', error);
+    logger.error('Fatal error occurred', {
+      error: error instanceof Error ? error.message : error,
+      stack: error instanceof Error ? error.stack : undefined
+    });
     process.exit(1);
   }
 }
 
-main().catch(console.error);
+main().catch(error => {
+  logger.error('Unhandled error in main', {
+    error: error instanceof Error ? error.message : error,
+    stack: error instanceof Error ? error.stack : undefined
+  });
+  process.exit(1);
+});

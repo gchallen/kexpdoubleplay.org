@@ -4,6 +4,7 @@ import * as https from 'https';
 import moment from 'moment';
 import { KEXPPlay } from './types';
 import { config } from './config';
+import logger from './logger';
 
 export class KEXPApi {
   private lastRequestTime = 0;
@@ -41,7 +42,11 @@ export class KEXPApi {
       
       if (timeSinceFailure < backoffDelay) {
         const waitTime = backoffDelay - timeSinceFailure;
-        console.log(`API backoff: waiting ${Math.round(waitTime / 1000)}s before retry (${this.consecutiveFailures} consecutive failures)`);
+        logger.warn('API backoff in effect', {
+          waitTimeSeconds: Math.round(waitTime / 1000),
+          consecutiveFailures: this.consecutiveFailures,
+          backoffDelayMs: backoffDelay
+        });
         await this.sleep(waitTime);
       }
     }
@@ -85,7 +90,12 @@ export class KEXPApi {
       this.lastFailureTime = Date.now();
       this.isHealthy = false;
       
-      console.error(`KEXP API request failed (attempt ${this.consecutiveFailures}):`, error instanceof Error ? error.message : error);
+      logger.error('KEXP API request failed', {
+        attempt: this.consecutiveFailures,
+        error: error instanceof Error ? error.message : error,
+        url: url.substring(0, 100) + '...',
+        stack: error instanceof Error ? error.stack : undefined
+      });
       throw error;
     }
   }
