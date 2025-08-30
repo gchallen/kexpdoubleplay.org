@@ -54,10 +54,22 @@ export class DoublePlayDetector {
         const doublePlay: DoublePlay = {
           artist: currentPlay.artist,
           title: currentPlay.song,
-          plays: sameSongPlays.map(play => ({
-            timestamp: play.airdate,
-            play_id: play.play_id
-          })),
+          plays: sameSongPlays.map((play, index) => {
+            // Find the end timestamp by looking at the next item in the sorted plays
+            const playIndex = sortedPlays.indexOf(play);
+            let endTimestamp: string | undefined;
+            
+            // Look for the next item after this play (could be trackplay or airbreak)
+            if (playIndex < sortedPlays.length - 1) {
+              endTimestamp = sortedPlays[playIndex + 1].airdate;
+            }
+            
+            return {
+              timestamp: play.airdate,
+              end_timestamp: endTimestamp,
+              play_id: play.play_id
+            };
+          }),
           dj: enrichedFirstPlay.host?.name,
           show: enrichedFirstPlay.show?.name
         };

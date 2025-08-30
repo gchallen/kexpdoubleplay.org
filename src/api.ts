@@ -150,7 +150,80 @@ export class KEXPApi {
     return showData;
   }
 
+  async getAllPlays(startTime: moment.Moment, endTime: moment.Moment): Promise<KEXPPlay[]> {
+    const plays: KEXPPlay[] = [];
+    let nextUrl: string | null = this.buildPlaylistUrl(startTime, endTime);
+    let requestCount = 0;
+    
+    while (nextUrl) {
+      requestCount++;
+      logger.debug('Fetching KEXP API page', {
+        url: nextUrl.substring(0, 150) + (nextUrl.length > 150 ? '...' : ''),
+        requestCount
+      });
+      const data = await this.rateLimitedFetch(nextUrl);
+      
+      if (data.results) {
+        for (const result of data.results) {
+          // Include ALL play types, not just trackplay
+          plays.push({
+            airdate: result.airdate,
+            artist: result.artist || '',
+            song: result.song || '',
+            album: result.album,
+            play_id: result.id,
+            play_type: result.play_type,
+            image_uri: result.image_uri,
+            thumbnail_uri: result.thumbnail_uri,
+            show: result.show ? {
+              id: result.show,
+              name: 'Unknown Show' // Will be filled in later if needed
+            } : undefined,
+            host: undefined // Will be filled in later if needed
+          });
+        }
+      }
+      
+      // Check for next page, but avoid infinite loops
+      const currentUrl: string = nextUrl;
+      nextUrl = data.next || null;
+      
+      // If we get the same URL back, break to avoid infinite loop
+      if (nextUrl === currentUrl) {
+        logger.debug('Breaking API pagination due to identical next URL');
+        break;
+      }
+      
+      // If no more results and we have a next URL, it might be empty pages
+      if (!data.results || data.results.length === 0) {
+        logger.debug('Breaking API pagination due to empty results');
+        break;
+      }
+      
+      // Safety check: limit to reasonable number of pages
+      if (requestCount > 1000) {
+        logger.warn('Breaking API pagination after 1000 requests to prevent infinite loop');
+        break;
+      }
+    }
+    
+    logger.info('Fetched playlist data', {
+      totalItems: plays.length,
+      requestCount,
+      startTime: startTime.toISOString(),
+      endTime: endTime.toISOString()
+    });
+    
+    return plays;
+  }
+
   async getPlays(startTime: moment.Moment, endTime: moment.Moment): Promise<KEXPPlay[]> {
+    const allPlays = await this.getAllPlays(startTime, endTime);
+    // Filter to only trackplay for backward compatibility
+    return allPlays.filter(play => play.play_type === 'trackplay');
+  }
+
+  private async getPlaysInternal(startTime: moment.Moment, endTime: moment.Moment): Promise<KEXPPlay[]> {
     const plays: KEXPPlay[] = [];
     let nextUrl: string | null = this.buildPlaylistUrl(startTime, endTime);
     let requestCount = 0;

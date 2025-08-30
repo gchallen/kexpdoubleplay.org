@@ -22,6 +22,7 @@ export interface DoublePlay {
   title: string;
   plays: Array<{
     timestamp: string;
+    end_timestamp?: string;  // End time when the song finished playing
     play_id: number;
   }>;
   dj?: string;
