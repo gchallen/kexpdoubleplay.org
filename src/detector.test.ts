@@ -9,10 +9,12 @@ describe('DoublePlayDetector', () => {
   });
 
   describe('detectDoublePlays', () => {
-    it('should detect a simple double play', () => {
+    it('should detect the Spike Island - Pulp double play from April 10, 2025', () => {
+      // This test verifies the known double play of "Pulp" by Spike Island
+      // that occurred on April 10, 2025 around 10:08 AM Central Time
       const plays: KEXPPlay[] = [
         {
-          airdate: '2025-04-10T10:08:00Z',
+          airdate: '2025-04-10T15:08:00Z', // 10:08 AM Central
           artist: 'Spike Island',
           song: 'Pulp',
           play_id: 1,
@@ -21,7 +23,7 @@ describe('DoublePlayDetector', () => {
           show: { id: 1, name: 'Morning Show' }
         },
         {
-          airdate: '2025-04-10T10:12:00Z',
+          airdate: '2025-04-10T15:12:00Z', // 10:12 AM Central
           artist: 'Spike Island',
           song: 'Pulp',
           play_id: 2,
@@ -37,6 +39,8 @@ describe('DoublePlayDetector', () => {
       expect(doublePlays[0].artist).toBe('Spike Island');
       expect(doublePlays[0].title).toBe('Pulp');
       expect(doublePlays[0].plays).toHaveLength(2);
+      expect(doublePlays[0].plays[0].timestamp).toBe('2025-04-10T15:08:00Z');
+      expect(doublePlays[0].plays[1].timestamp).toBe('2025-04-10T15:12:00Z');
       expect(doublePlays[0].dj).toBe('DJ Test');
       expect(doublePlays[0].show).toBe('Morning Show');
     });
