@@ -29,10 +29,20 @@ export interface DoublePlay {
   show?: string;
 }
 
+export interface ScanStats {
+  totalScanTimeMs: number;
+  totalApiRequests: number;
+  lastScanDuration: number;
+  lastScanRequests: number;
+  lastScanTime: string;
+  scanDirection: 'forward' | 'backward' | 'mixed';
+}
+
 export interface DoublePlayData {
   startTime: string;
   endTime: string;
   doublePlays: DoublePlay[];
+  scanStats?: ScanStats;
 }
 
 export interface Config {

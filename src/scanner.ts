@@ -1,11 +1,17 @@
+// Load environment variables first
+import dotenv from 'dotenv';
+dotenv.config();
+
 import moment from 'moment';
 import * as cliProgress from 'cli-progress';
 import chalk from 'chalk';
+import * as cron from 'node-cron';
 import { KEXPApi } from './api';
 import { DoublePlayDetector } from './detector';
 import { Storage } from './storage';
+import { BackupManager } from './backup-manager';
 import { config } from './config';
-import { DoublePlayData } from './types';
+import { DoublePlayData, ScanStats } from './types';
 import { ApiServer } from './api-server';
 import { ScanQueue } from './scan-queue';
 import logger from './logger';
@@ -14,15 +20,18 @@ export class Scanner {
   private api: KEXPApi;
   private detector: DoublePlayDetector;
   private storage: Storage;
+  private backupManager: BackupManager;
   private data: DoublePlayData;
   private isRunning = false;
   private apiServer?: ApiServer;
   private scanQueue?: ScanQueue;
+  private backupCheckTask?: cron.ScheduledTask;
 
   constructor() {
     this.api = new KEXPApi();
     this.detector = new DoublePlayDetector(this.api);
     this.storage = new Storage(config.dataFilePath);
+    this.backupManager = new BackupManager();
     this.data = {
       startTime: moment().subtract(7, 'days').toISOString(),
       endTime: moment().toISOString(),
@@ -32,6 +41,8 @@ export class Scanner {
 
   async initialize(): Promise<void> {
     this.data = await this.storage.load();
+    await this.backupManager.initialize();
+    
     console.log(chalk.cyan('🎵 KEXP Double Play Scanner Initialized'));
     console.log(`   Data range: ${chalk.yellow(moment(this.data.startTime).format('MMM DD, YYYY HH:mm'))} → ${chalk.yellow(moment(this.data.endTime).format('MMM DD, YYYY HH:mm'))}`);
     console.log(`   Existing double plays: ${chalk.green(this.data.doublePlays.length)}\n`);
@@ -48,6 +59,55 @@ export class Scanner {
     await this.apiServer.start();
     console.log(chalk.dim(`   API server: http://localhost:${apiPort}\n`));
     logger.debug('API server started', { port: apiPort });
+    
+    // Schedule periodic backup checks (every 10 minutes)
+    this.backupCheckTask = cron.schedule('*/10 * * * *', async () => {
+      try {
+        await this.backupManager.checkAndBackup();
+      } catch (error) {
+        logger.error('Backup check failed', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    });
+    
+    // Start the backup check task
+    this.backupCheckTask.start();
+    logger.debug('Backup check scheduled every 10 minutes');
+  }
+
+  private updateScanStats(direction: 'forward' | 'backward' | 'mixed', scanTimeMs: number, requestCount: number): void {
+    const now = moment().toISOString();
+    
+    // Initialize scan stats if not present
+    if (!this.data.scanStats) {
+      this.data.scanStats = {
+        totalScanTimeMs: 0,
+        totalApiRequests: 0,
+        lastScanDuration: 0,
+        lastScanRequests: 0,
+        lastScanTime: now,
+        scanDirection: direction
+      };
+    }
+    
+    // Update statistics
+    this.data.scanStats.totalScanTimeMs += scanTimeMs;
+    this.data.scanStats.totalApiRequests += requestCount;
+    this.data.scanStats.lastScanDuration = scanTimeMs;
+    this.data.scanStats.lastScanRequests = requestCount;
+    this.data.scanStats.lastScanTime = now;
+    this.data.scanStats.scanDirection = direction;
+  }
+
+  private async saveDataWithBackupCheck(): Promise<void> {
+    await this.storage.save(this.data);
+    // Trigger immediate backup check after data save (async, non-blocking)
+    this.backupManager.checkAndBackup().catch(error => {
+      logger.error('Background backup check failed', {
+        error: error instanceof Error ? error.message : error
+      });
+    });
   }
 
   async start(): Promise<void> {
@@ -58,6 +118,10 @@ export class Scanner {
       
       // Initialize and start the scan queue
       this.scanQueue = new ScanQueue(this.api, this.detector, this.storage, this.data);
+      this.scanQueue.setOnScanComplete((direction, scanTimeMs, requestCount) => {
+        this.updateScanStats(direction, scanTimeMs, requestCount);
+      });
+      this.scanQueue.setSaveDataHandler(() => this.saveDataWithBackupCheck());
       this.scanQueue.start();
       
       console.log(chalk.dim(`⏰ Queue-based scanning started - forward scans every ${config.scanIntervalMinutes} minutes...`));
@@ -76,6 +140,12 @@ export class Scanner {
     
     this.isRunning = false;
     console.log(chalk.yellow('\n📴 Scanner stopping...'));
+    
+    // Stop backup check task
+    if (this.backupCheckTask) {
+      this.backupCheckTask.stop();
+      logger.debug('Stopped backup check task');
+    }
     
     // Stop the scan queue
     this.scanQueue?.stop();
@@ -124,7 +194,7 @@ export class Scanner {
       });
       await this.scanRange(endTime, now, 'forward');
       this.data.endTime = now.toISOString();
-      await this.storage.save(this.data);
+      await this.saveDataWithBackupCheck();
     } else {
       console.log(chalk.dim('✓ Already up to date'));
       logger.debug('Skipping forward scan - already up to date');
@@ -163,7 +233,7 @@ export class Scanner {
         
         // Update our position
         this.data.startTime = targetTime.toISOString();
-        await this.storage.save(this.data);
+        await this.saveDataWithBackupCheck();
         
         // Move further back
         const daysInChunk = currentStartTime.diff(targetTime, 'days');
@@ -204,6 +274,9 @@ export class Scanner {
     direction: 'forward' | 'backward'
   ): Promise<void> {
     console.log(chalk.magenta(`🔍 DEBUG: scanRange called - ${direction} from ${startTime.format('MMM DD HH:mm')} to ${endTime.format('MMM DD HH:mm')}`));
+    
+    const scanStartTime = Date.now();
+    const requestCountBefore = this.api.getTotalRequests();
     const hourChunks: Array<{ start: moment.Moment; end: moment.Moment }> = [];
     
     let current = startTime.clone();
@@ -285,7 +358,7 @@ export class Scanner {
         }
         
         // Save progress after each chunk (includes timestamp updates and any new double plays)
-        await this.storage.save(this.data);
+        await this.saveDataWithBackupCheck();
         
         processedChunks++;
         progressBar.update(processedChunks);
@@ -350,7 +423,7 @@ export class Scanner {
         try {
           await this.scanRange(lastEndTime, now, 'forward');
           this.data.endTime = now.toISOString();
-          await this.storage.save(this.data);
+          await this.saveDataWithBackupCheck();
         } catch (error) {
           logger.error('Error in periodic scan', {
             error: error instanceof Error ? error.message : error

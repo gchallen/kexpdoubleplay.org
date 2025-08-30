@@ -5,6 +5,5 @@ coverage/
 .env
 .env.local
 .DS_Store
-double-plays.json
 *.tmp
 bun.lockblogs/

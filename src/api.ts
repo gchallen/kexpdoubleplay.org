@@ -83,6 +83,9 @@ export class KEXPApi {
         }
       });
       
+      // Increment total request counter
+      this.totalRequests++;
+      
       const requestDuration = Date.now() - requestStartTime;
       logger.debug('API request completed', {
         url: url,
@@ -131,12 +134,22 @@ export class KEXPApi {
     return Math.min(exponentialDelay, maxDelay);
   }
 
+  private totalRequests = 0;
+
   getHealthStatus(): { isHealthy: boolean; consecutiveFailures: number; lastFailureTime: number | null } {
     return {
       isHealthy: this.isHealthy,
       consecutiveFailures: this.consecutiveFailures,
       lastFailureTime: this.lastFailureTime
     };
+  }
+
+  getTotalRequests(): number {
+    return this.totalRequests;
+  }
+
+  resetRequestCount(): void {
+    this.totalRequests = 0;
   }
 
   private async getShowInfo(showId: number): Promise<any> {

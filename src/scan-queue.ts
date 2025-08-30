@@ -25,6 +25,8 @@ export class ScanQueue {
   private isRunning = false;
   private progressMonitor: ProgressMonitor;
   private stateManager: ScannerStateManager;
+  private onScanComplete?: (direction: 'forward' | 'backward' | 'mixed', scanTimeMs: number, requestCount: number) => void;
+  private saveData?: () => Promise<void>;
 
   constructor(api: KEXPApi, detector: DoublePlayDetector, storage: Storage, data: DoublePlayData) {
     this.api = api;
@@ -33,6 +35,14 @@ export class ScanQueue {
     this.data = data;
     this.stateManager = new ScannerStateManager();
     this.progressMonitor = new ProgressMonitor(data, this.stateManager);
+  }
+
+  setOnScanComplete(callback: (direction: 'forward' | 'backward' | 'mixed', scanTimeMs: number, requestCount: number) => void): void {
+    this.onScanComplete = callback;
+  }
+
+  setSaveDataHandler(saveHandler: () => Promise<void>): void {
+    this.saveData = saveHandler;
   }
 
   start(): void {
@@ -231,6 +241,9 @@ export class ScanQueue {
   }
 
   private async processJob(job: ScanJob): Promise<void> {
+    const jobStartTime = Date.now();
+    const requestCountBefore = this.api.getTotalRequests();
+    
     // Validate job parameters
     if (!job.startTime || !job.endTime || !job.startTime.isValid() || !job.endTime.isValid()) {
       throw new Error(`Invalid job time parameters: start=${job.startTime?.toISOString()}, end=${job.endTime?.toISOString()}`);
@@ -298,7 +311,21 @@ export class ScanQueue {
         this.data.startTime = job.startTime.toISOString();
       }
 
-      await this.storage.save(this.data);
+      // Use custom save handler if provided (includes backup triggers), otherwise fallback to direct storage
+      if (this.saveData) {
+        await this.saveData();
+      } else {
+        await this.storage.save(this.data);
+      }
+      
+      // Report scan statistics
+      const jobEndTime = Date.now();
+      const scanDuration = jobEndTime - jobStartTime;
+      const requestCount = this.api.getTotalRequests() - requestCountBefore;
+      
+      if (this.onScanComplete) {
+        this.onScanComplete(job.type, scanDuration, requestCount);
+      }
     } catch (error) {
       // Increment retry count instead of logging immediately
       this.stateManager.incrementRetryCount();
