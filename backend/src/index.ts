@@ -1,5 +1,8 @@
 #!/usr/bin/env node
 
+// Load .env before any other imports to ensure environment variables are available
+import 'dotenv/config';
+
 import { Scanner } from './scanner';
 import logger from './logger';
 import * as fs from 'fs';

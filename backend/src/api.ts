@@ -54,8 +54,20 @@ export class KEXPApi {
     const now = Date.now();
     const timeSinceLastRequest = now - this.lastRequestTime;
     
+    // Log the configured delay and actual wait time
+    logger.debug('Rate limiting check', {
+      configuredDelayMs: config.rateLimitDelay,
+      timeSinceLastRequestMs: timeSinceLastRequest,
+      willWaitMs: Math.max(0, config.rateLimitDelay - timeSinceLastRequest)
+    });
+    
     if (timeSinceLastRequest < config.rateLimitDelay) {
-      await this.sleep(config.rateLimitDelay - timeSinceLastRequest);
+      const waitTime = config.rateLimitDelay - timeSinceLastRequest;
+      logger.debug('Applying rate limit delay', {
+        waitTimeMs: waitTime,
+        reason: 'Rate limit enforcement'
+      });
+      await this.sleep(waitTime);
     }
     
     this.lastRequestTime = Date.now();
