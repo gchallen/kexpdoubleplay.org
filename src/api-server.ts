@@ -5,6 +5,7 @@ import { Storage } from './storage';
 import { config } from './config';
 import { DoublePlayData } from './types';
 import { KEXPApi } from './api';
+import { ScanQueue } from './scan-queue';
 import logger from './logger';
 
 export class ApiServer {
@@ -16,7 +17,7 @@ export class ApiServer {
   private scannerStatus: 'starting' | 'running' | 'stopped' | 'error' = 'starting';
   private lastError: string | null = null;
 
-  constructor(private port: number = 3000, private api?: KEXPApi) {
+  constructor(private port: number = 3000, private api?: KEXPApi, private scanQueue?: ScanQueue) {
     this.app = express();
     this.storage = new Storage(config.dataFilePath);
     this.scannerStartTime = new Date();
@@ -75,6 +76,54 @@ export class ApiServer {
         const totalScanDays = moment(data.endTime).diff(moment(data.startTime), 'days');
         const avgDoublePlaysPerDay = totalScanDays > 0 ? (data.doublePlays.length / totalScanDays).toFixed(2) : '0.00';
         
+        // Get scanning progress data if available
+        let scanningProgress = null;
+        if (this.scanQueue) {
+          const scannerState = this.scanQueue.getScannerState();
+          const stopDate = config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(365, 'days');
+          
+          let progressPercentage = 0;
+          let currentChunkStart = null;
+          let currentChunkEnd = null;
+          
+          if (scannerState.currentScanType === 'backward' && scannerState.currentScanStart && scannerState.currentScanEnd) {
+            // Calculate progress for current historical chunk
+            const chunkStartTime = scannerState.currentScanStart;
+            const chunkEndTime = scannerState.currentScanEnd;
+            const currentStartTime = moment(data.startTime);
+            
+            const chunkTotalHours = chunkEndTime.diff(chunkStartTime, 'hours');
+            const completedHours = Math.max(0, chunkEndTime.diff(currentStartTime, 'hours'));
+            progressPercentage = chunkTotalHours > 0 ? Math.min((completedHours / chunkTotalHours) * 100, 100) : 0;
+            
+            currentChunkStart = chunkStartTime.toISOString();
+            currentChunkEnd = chunkEndTime.toISOString();
+          } else if (scannerState.currentScanType === 'forward') {
+            // Forward scans show 100% progress
+            progressPercentage = 100;
+            const currentEnd = moment(data.endTime);
+            const now = moment();
+            currentChunkStart = currentEnd.toISOString();
+            currentChunkEnd = now.toISOString();
+          }
+          
+          scanningProgress = {
+            currentScanType: scannerState.currentScanType,
+            currentChunkStart: currentChunkStart,
+            currentChunkEnd: currentChunkEnd,
+            progressPercentage: Math.round(progressPercentage * 100) / 100,
+            queueLength: scannerState.queueLength,
+            requests: {
+              total: scannerState.totalRequests,
+              forward: scannerState.forwardRequests,
+              backward: scannerState.backwardRequests
+            },
+            currentRetryCount: scannerState.currentRetryCount,
+            isRunning: scannerState.isRunning,
+            historicalScanStopDate: config.historicalScanStopDate
+          };
+        }
+        
         const health = {
           status: this.scannerStatus,
           uptime: Math.floor(uptime / 1000), // seconds
@@ -90,6 +139,7 @@ export class ApiServer {
             avgDoublePlaysPerDay: parseFloat(avgDoublePlaysPerDay),
             dataFileExists: true
           },
+          scanningProgress: scanningProgress,
           kexpApi: {
             isHealthy: apiHealthStatus.isHealthy,
             consecutiveFailures: apiHealthStatus.consecutiveFailures,
@@ -299,11 +349,15 @@ export class ApiServer {
     });
   }
 
-  // Methods to update scanner status
+  // Methods to update scanner status and set scan queue
   updateScannerStatus(status: 'running' | 'stopped' | 'error', error?: string): void {
     this.scannerStatus = status;
     this.lastScanTime = new Date();
     this.lastError = error || null;
+  }
+
+  setScanQueue(scanQueue: ScanQueue): void {
+    this.scanQueue = scanQueue;
   }
 
   start(): Promise<void> {

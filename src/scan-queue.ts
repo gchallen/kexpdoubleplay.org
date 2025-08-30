@@ -411,4 +411,9 @@ export class ScanQueue {
       }
     }
   }
+
+  // Method to access scanning state for health monitoring
+  getScannerState() {
+    return this.stateManager.getState();
+  }
 }

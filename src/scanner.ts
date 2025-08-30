@@ -235,6 +235,10 @@ export class Scanner {
         this.updateScanStats(direction, scanTimeMs, requestCount);
       });
       this.scanQueue.setSaveDataHandler(() => this.saveDataWithBackupCheck());
+      
+      // Pass scan queue to API server for health monitoring
+      this.apiServer?.setScanQueue(this.scanQueue);
+      
       this.scanQueue.start();
       
       console.log(chalk.dim(`⏰ Queue-based scanning started - forward scans every ${config.scanIntervalMinutes} minutes...`));
