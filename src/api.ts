@@ -93,7 +93,7 @@ export class KEXPApi {
       logger.error('KEXP API request failed', {
         attempt: this.consecutiveFailures,
         error: error instanceof Error ? error.message : error,
-        url: url.substring(0, 100) + '...',
+        url: url, // Show full URL in error logs for debugging
         stack: error instanceof Error ? error.stack : undefined
       });
       throw error;
@@ -139,7 +139,7 @@ export class KEXPApi {
     while (nextUrl) {
       requestCount++;
       logger.debug('Fetching KEXP API page', {
-        url: nextUrl.substring(0, 100) + (nextUrl.length > 100 ? '...' : ''),
+        url: nextUrl.substring(0, 150) + (nextUrl.length > 150 ? '...' : ''),
         requestCount
       });
       const data = await this.rateLimitedFetch(nextUrl);
@@ -196,7 +196,20 @@ export class KEXPApi {
     const start = startTime.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     const end = endTime.utc().format('YYYY-MM-DDTHH:mm:ss') + 'Z';
     
-    return `${config.apiBaseUrl}/plays/?airdate_after=${start}&airdate_before=${end}&ordering=airdate`;
+    // Properly encode the URL parameters to prevent issues
+    const encodedStart = encodeURIComponent(start);
+    const encodedEnd = encodeURIComponent(end);
+    
+    const url = `${config.apiBaseUrl}/plays/?airdate_after=${encodedStart}&airdate_before=${encodedEnd}&ordering=airdate`;
+    
+    // Validate URL is properly formed
+    logger.debug('Built playlist URL', {
+      startTime: start,
+      endTime: end,
+      url: url.substring(0, 150) + (url.length > 150 ? '...' : '')
+    });
+    
+    return url;
   }
 
   async enrichPlayWithShowInfo(play: KEXPPlay): Promise<KEXPPlay> {
