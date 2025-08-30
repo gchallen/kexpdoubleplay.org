@@ -6,6 +6,22 @@ import { config } from './config';
 import { DoublePlayData } from './types';
 import { KEXPApi } from './api';
 import { ScanQueue } from './scan-queue';
+import {
+  HealthResponseSchema,
+  DoubleePlaysResponseSchema,
+  PaginatedResponseSchema,
+  StatsResponseSchema,
+  ApiInfoResponseSchema,
+  ErrorResponseSchema,
+  PaginationQuerySchema,
+  type HealthResponse,
+  type DoubleePlaysResponse,
+  type PaginatedResponse,
+  type StatsResponse,
+  type ApiInfoResponse,
+  type ErrorResponse,
+  type PaginationQuery
+} from './api-schemas';
 import logger from './logger';
 
 export class ApiServer {
@@ -165,13 +181,13 @@ export class ApiServer {
         };
 
         const statusCode = this.scannerStatus === 'error' ? 503 : 200;
-        res.status(statusCode).json(health);
+        this.sendValidatedResponse(res, health, HealthResponseSchema, statusCode);
       } catch (error) {
-        res.status(500).json({
-          status: 'error',
+        const errorResponse: ErrorResponse = {
           error: 'Failed to load scanner data',
           message: error instanceof Error ? error.message : 'Unknown error'
-        });
+        };
+        this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 500);
       }
     });
 
@@ -195,7 +211,7 @@ export class ApiServer {
           retrievalStatus = 'stopped';
         }
         
-        res.json({
+        const response: DoubleePlaysResponse = {
           startTime: data.startTime,
           endTime: data.endTime,
           totalCount: data.doublePlays.length,
@@ -214,27 +230,40 @@ export class ApiServer {
               durationDays: moment(data.endTime).diff(moment(data.startTime), 'days')
             }
           }
-        });
+        };
+
+        this.sendValidatedResponse(res, response, DoubleePlaysResponseSchema);
       } catch (error) {
-        res.status(500).json({
+        const errorResponse: ErrorResponse = {
           error: 'Failed to load double plays data',
           message: error instanceof Error ? error.message : 'Unknown error'
-        });
+        };
+        this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 500);
       }
     });
 
     // Get double plays with pagination
     this.app.get('/api/double-plays/paginated', async (req, res) => {
       try {
+        // Validate query parameters
+        const queryParams = this.validateQueryParams<PaginationQuery>(req.query, PaginationQuerySchema);
+        if (!queryParams) {
+          const errorResponse: ErrorResponse = {
+            error: 'Invalid query parameters',
+            message: 'page must be >= 1, limit must be between 1 and 100'
+          };
+          return this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 400);
+        }
+
         const data = await this.storage.load();
-        const page = parseInt(req.query.page as string) || 1;
-        const limit = Math.min(parseInt(req.query.limit as string) || 10, 100); // Max 100
+        const page = queryParams.page;
+        const limit = queryParams.limit;
         const offset = (page - 1) * limit;
 
         const paginatedPlays = data.doublePlays.slice(offset, offset + limit);
         const totalPages = Math.ceil(data.doublePlays.length / limit);
 
-        res.json({
+        const response: PaginatedResponse = {
           page,
           limit,
           totalCount: data.doublePlays.length,
@@ -246,12 +275,15 @@ export class ApiServer {
             earliest: data.startTime,
             latest: data.endTime
           }
-        });
+        };
+
+        this.sendValidatedResponse(res, response, PaginatedResponseSchema);
       } catch (error) {
-        res.status(500).json({
+        const errorResponse: ErrorResponse = {
           error: 'Failed to load double plays data',
           message: error instanceof Error ? error.message : 'Unknown error'
-        });
+        };
+        this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 500);
       }
     });
 
@@ -298,7 +330,7 @@ export class ApiServer {
           .sort(([,a], [,b]) => b - a)
           .slice(0, 5);
 
-        res.json({
+        const response: StatsResponse = {
           summary: {
             totalDoublePlays: data.doublePlays.length,
             uniqueArtists: Object.keys(artistCounts).length,
@@ -315,18 +347,21 @@ export class ApiServer {
           topShows: topShows.map(([show, count]) => ({ show, count })),
           playCountDistribution,
           generatedAt: new Date().toISOString()
-        });
+        };
+
+        this.sendValidatedResponse(res, response, StatsResponseSchema);
       } catch (error) {
-        res.status(500).json({
+        const errorResponse: ErrorResponse = {
           error: 'Failed to generate statistics',
           message: error instanceof Error ? error.message : 'Unknown error'
-        });
+        };
+        this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 500);
       }
     });
 
     // API info endpoint
     this.app.get('/api', (req, res) => {
-      res.json({
+      const response: ApiInfoResponse = {
         name: 'KEXP Double Play Scanner API',
         version: '1.0.0',
         description: 'REST API for KEXP double play data and scanner health',
@@ -337,15 +372,19 @@ export class ApiServer {
           '/api/stats': 'Statistics about double plays'
         },
         timestamp: new Date().toISOString()
-      });
+      };
+
+      this.sendValidatedResponse(res, response, ApiInfoResponseSchema);
     });
 
     // 404 handler
     this.app.use((req, res) => {
-      res.status(404).json({
+      const errorResponse: ErrorResponse = {
         error: 'Endpoint not found',
         availableEndpoints: ['/api', '/api/health', '/api/double-plays', '/api/double-plays/paginated', '/api/stats']
-      });
+      };
+      
+      this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 404);
     });
   }
 
@@ -358,6 +397,39 @@ export class ApiServer {
 
   setScanQueue(scanQueue: ScanQueue): void {
     this.scanQueue = scanQueue;
+  }
+
+  // Helper method for safe response validation and sending
+  private sendValidatedResponse<T>(res: express.Response, data: unknown, schema: any, statusCode: number = 200): void {
+    try {
+      const validatedData = schema.parse(data);
+      res.status(statusCode).json(validatedData);
+    } catch (error) {
+      logger.error('API response validation failed', {
+        error: error instanceof Error ? error.message : error,
+        endpoint: res.req.path
+      });
+      
+      const errorResponse: ErrorResponse = {
+        error: 'Internal server error',
+        message: 'Response validation failed'
+      };
+      
+      res.status(500).json(ErrorResponseSchema.parse(errorResponse));
+    }
+  }
+
+  // Helper method for safe query parameter validation
+  private validateQueryParams<T>(query: any, schema: any): T | null {
+    try {
+      return schema.parse(query);
+    } catch (error) {
+      logger.warn('Invalid query parameters', {
+        query,
+        error: error instanceof Error ? error.message : error
+      });
+      return null;
+    }
   }
 
   start(): Promise<void> {
