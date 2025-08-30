@@ -7,6 +7,7 @@ export interface ScannerState {
   totalRequests: number;
   forwardRequests: number;
   backwardRequests: number;
+  currentRetryCount: number;
   isRunning: boolean;
   queueLength: number;
 }
@@ -17,6 +18,7 @@ export class ScannerStateManager {
     totalRequests: 0,
     forwardRequests: 0,
     backwardRequests: 0,
+    currentRetryCount: 0,
     isRunning: false,
     queueLength: 0
   };
@@ -53,6 +55,14 @@ export class ScannerStateManager {
 
   resetBackwardRequests(): void {
     this.state.backwardRequests = 0;
+  }
+
+  incrementRetryCount(): void {
+    this.state.currentRetryCount++;
+  }
+
+  resetRetryCount(): void {
+    this.state.currentRetryCount = 0;
   }
 
   setRunning(running: boolean): void {

@@ -24,9 +24,9 @@ export class ProgressMonitor {
     }
 
     this.isRunning = true;
-    this.initializeProgressBar();
     this.startCurrentChunk();
     this.scheduleUpdates();
+    // Don't initialize progress bar until scanning actually starts
   }
 
   stop(): void {
@@ -42,7 +42,7 @@ export class ProgressMonitor {
 
   private initializeProgressBar(): void {
     this.progressBar = new cliProgress.SingleBar({
-      format: `   {bar} {percentage}% | {action} | {timeRange} | {requests} requests | {eta_formatted} ETA`,
+      format: `   {bar} {percentage}% | {action} | {timeRange} | {requests} requests{retryInfo} | {eta_formatted} ETA`,
       barCompleteChar: '█',
       barIncompleteChar: '░',
       hideCursor: true,
@@ -53,7 +53,8 @@ export class ProgressMonitor {
     this.progressBar.start(100, 0, {
       action: 'Initializing...',
       timeRange: '',
-      requests: 0
+      requests: 0,
+      retryInfo: ''
     });
   }
 
@@ -77,7 +78,7 @@ export class ProgressMonitor {
 
   private scheduleUpdates(): void {
     this.updateTimer = setInterval(() => {
-      if (!this.isRunning || !this.progressBar) return;
+      if (!this.isRunning) return;
       
       this.updateCurrentChunk();
       this.updateProgressBar();
@@ -101,7 +102,8 @@ export class ProgressMonitor {
     }
 
     // If no chunk is set, or we're switching scan types, initialize appropriate chunk
-    if (!this.chunkFixed) {
+    // But only if we're actually scanning (not idle)
+    if (!this.chunkFixed && scannerState.currentScanType !== 'idle') {
       if (scannerState.currentScanType === 'backward') {
         this.startNewHistoricalChunk();
       }
@@ -122,10 +124,16 @@ export class ProgressMonitor {
     // Reset backward request counter for new chunk
     this.stateManager.resetBackwardRequests();
     
-    // Create new progress bar for this chunk
-    this.createNewProgressBar();
+    // Clear any existing progress bar before console output
+    if (this.progressBar) {
+      this.progressBar.stop();
+      this.progressBar = undefined;
+    }
     
     console.log(`\n📅 New historical chunk: ${this.currentChunkStart.format('MMM DD HH:mm')} → ${this.currentChunkEnd.format('MMM DD HH:mm')}`);
+    
+    // Reinitialize progress bar after console output
+    this.initializeProgressBar();
   }
 
   private cleanupProgressBar(): void {
@@ -144,9 +152,10 @@ export class ProgressMonitor {
   }
 
   private updateProgressBar(): void {
-    if (!this.progressBar) return;
-    
     const scannerState = this.stateManager.getState();
+    
+    // Don't initialize progress bar here - let startNewHistoricalChunk handle it
+    if (!this.progressBar) return; // No progress bar until explicitly created
     let progressValue = 0;
     let timeRange = '';
     let action = 'Idle';
@@ -185,10 +194,16 @@ export class ProgressMonitor {
       ? scannerState.forwardRequests 
       : scannerState.backwardRequests;
 
+    // Show retry info if there are retries
+    const retryInfo = scannerState.currentRetryCount > 0 
+      ? ` (retry ${scannerState.currentRetryCount})` 
+      : '';
+
     this.progressBar.update(progressValue, {
       action: action,
       timeRange: timeRange,
-      requests: requestCount
+      requests: requestCount,
+      retryInfo: retryInfo
     });
   }
 }
