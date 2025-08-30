@@ -119,8 +119,32 @@ export class ScanQueue {
       } catch (error) {
         logger.error('Error processing scan job', {
           jobType: job.type,
-          error: error instanceof Error ? error.message : error
+          error: error instanceof Error ? error.message : error,
+          startTime: job.startTime.toISOString(),
+          endTime: job.endTime.toISOString()
         });
+        
+        // Check if this is an API health issue
+        const healthStatus = this.api.getHealthStatus();
+        if (!healthStatus.isHealthy) {
+          logger.warn('API appears unhealthy, will retry job after exponential backoff');
+          
+          // For backward scans, we can re-queue this job to try again later
+          if (job.type === 'backward') {
+            // Add some delay and put job back at end of queue
+            setTimeout(() => {
+              if (this.isRunning) {
+                this.queue.push(job);
+                this.processQueue(); // Resume processing
+              }
+            }, 5000); // 5 second delay before retry
+          }
+        } else {
+          // Non-API error - log and continue with next job
+          logger.error('Non-API error in scan job, continuing with next job', {
+            error: error instanceof Error ? error.message : error
+          });
+        }
       }
     }
 
@@ -133,6 +157,15 @@ export class ScanQueue {
   }
 
   private async processJob(job: ScanJob): Promise<void> {
+    // Validate job parameters
+    if (!job.startTime || !job.endTime || !job.startTime.isValid() || !job.endTime.isValid()) {
+      throw new Error(`Invalid job time parameters: start=${job.startTime?.toISOString()}, end=${job.endTime?.toISOString()}`);
+    }
+
+    if (job.startTime.isAfter(job.endTime)) {
+      throw new Error(`Invalid time range: start time ${job.startTime.toISOString()} is after end time ${job.endTime.toISOString()}`);
+    }
+
     logger.debug('Processing scan job', {
       type: job.type,
       from: job.startTime.toISOString(),
@@ -141,6 +174,9 @@ export class ScanQueue {
 
     // Update scanner state for progress monitor
     this.stateManager.updateScanJob(job.type, job.startTime, job.endTime);
+    
+    // Reset retry count when starting a new job
+    this.stateManager.resetRetryCount();
 
     // Process one hour chunk only
     const chunkEnd = moment.min(
@@ -148,29 +184,64 @@ export class ScanQueue {
       job.endTime
     );
 
-    const plays = await this.api.getPlays(job.startTime, chunkEnd);
-    this.stateManager.incrementRequests(); // Increment request counter
-    const newDoublePlays = await this.detector.detectDoublePlays(plays);
+    // Validate chunk times before making API call
+    if (!chunkEnd.isValid() || job.startTime.isAfter(chunkEnd)) {
+      throw new Error(`Invalid chunk time range: start=${job.startTime.toISOString()}, chunkEnd=${chunkEnd.toISOString()}`);
+    }
 
-    if (newDoublePlays.length > 0) {
-      this.data.doublePlays.push(...newDoublePlays);
-      this.data.doublePlays.sort((a, b) => new Date(a.plays[0].timestamp).getTime() - new Date(b.plays[0].timestamp).getTime());
+    logger.debug('Making API request for chunk', {
+      type: job.type,
+      chunkStart: job.startTime.toISOString(),
+      chunkEnd: chunkEnd.toISOString(),
+      chunkDurationHours: chunkEnd.diff(job.startTime, 'hours', true)
+    });
+
+    let plays: any[] = [];
+    let newDoublePlays: any[] = [];
+    
+    try {
+      plays = await this.api.getPlays(job.startTime, chunkEnd);
+      this.stateManager.incrementRequests(); // Increment request counter
+      this.stateManager.resetRetryCount(); // Reset retry count on successful request
       
-      logger.info('Double play detected', {
-        artist: newDoublePlays[0].artist,
-        title: newDoublePlays[0].title,
-        playCount: newDoublePlays[0].plays.length
-      });
-    }
+      newDoublePlays = await this.detector.detectDoublePlays(plays);
 
-    // Update data timestamps
-    if (job.type === 'forward') {
-      this.data.endTime = chunkEnd.toISOString();
-    } else {
-      this.data.startTime = job.startTime.toISOString();
-    }
+      if (newDoublePlays.length > 0) {
+        this.data.doublePlays.push(...newDoublePlays);
+        this.data.doublePlays.sort((a, b) => new Date(a.plays[0].timestamp).getTime() - new Date(b.plays[0].timestamp).getTime());
+        
+        logger.info('Double play detected', {
+          artist: newDoublePlays[0].artist,
+          title: newDoublePlays[0].title,
+          playCount: newDoublePlays[0].plays.length
+        });
+      }
 
-    await this.storage.save(this.data);
+      // Update data timestamps
+      if (job.type === 'forward') {
+        this.data.endTime = chunkEnd.toISOString();
+      } else {
+        this.data.startTime = job.startTime.toISOString();
+      }
+
+      await this.storage.save(this.data);
+    } catch (error) {
+      // Increment retry count instead of logging immediately
+      this.stateManager.incrementRetryCount();
+      
+      // Only log after multiple retries
+      if (this.stateManager.getState().currentRetryCount > 3) {
+        logger.error('API request failed after multiple retries', {
+          attempt: this.stateManager.getState().currentRetryCount,
+          error: error instanceof Error ? error.message : error,
+          jobType: job.type,
+          startTime: job.startTime.toISOString(),
+          endTime: chunkEnd.toISOString()
+        });
+      }
+      
+      throw error; // Re-throw to trigger existing error handling
+    }
 
     // If there's more work for this job, queue the next chunk
     if (chunkEnd.isBefore(job.endTime)) {
