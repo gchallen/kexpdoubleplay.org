@@ -13,22 +13,22 @@ Next.js frontend application for viewing KEXP double play data in a beautiful KE
 ## Quick Start
 
 ```bash
-npm run dev
+bun dev
 ```
 
-Open [http://localhost:3000](http://localhost:3000) with your browser.
+Open [http://localhost:3001](http://localhost:3001) with your browser (port 3001 when backend is running on 3000).
 
 ## Build & Deploy
 
 ```bash
 # Build for production
-npm run build
+bun run build
 
 # Start production server
-npm start
+bun start
 
 # Static export (for Vercel/Netlify)
-npm run export
+bun run export
 ```
 
 ## Environment Variables
@@ -36,7 +36,7 @@ npm run export
 Create `.env.local`:
 
 ```
-NEXT_PUBLIC_API_URL=http://localhost:3000/api
+NEXT_PUBLIC_BACKEND_URL=http://localhost:3000
 ```
 
 ## Design System
