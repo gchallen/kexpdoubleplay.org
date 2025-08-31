@@ -47,11 +47,9 @@ async function main() {
     const gracefulShutdown = async (signal: string) => {
       logger.info('Graceful shutdown initiated', { signal });
       await scanner.stop();
-      // Give a moment for connections to close, then exit immediately
-      setTimeout(() => {
-        logger.info('Process exiting');
-        process.exit(0);
-      }, 100); // Reduced from 1000ms to 100ms for cleaner exit
+      // Exit immediately after stop completes (which now includes backup)
+      logger.info('Process exiting');
+      process.exit(0);
     };
 
     process.on('SIGINT', () => gracefulShutdown('SIGINT'));

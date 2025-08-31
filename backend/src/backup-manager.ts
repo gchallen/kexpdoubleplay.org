@@ -322,50 +322,94 @@ export class BackupManager {
     const timestamp = moment().format('YYYY-MM-DD-HH-mm-ss');
     const filename = `double-plays-${timestamp}.json`;
     const fileContent = JSON.stringify(data, null, 2);
-    const results: string[] = [];
+    const backupPromises: Promise<{ method: string; success: boolean }>[] = [];
 
-    // Create local backup if enabled
+    // Create local backup if enabled (runs in parallel)
     if (this.isLocalEnabled && this.localBackupPath) {
-      try {
-        const localFilePath = path.join(this.localBackupPath, filename);
-        fs.writeFileSync(localFilePath, fileContent);
+      backupPromises.push(
+        (async () => {
+          try {
+            const localFilePath = path.join(this.localBackupPath!, filename);
+            fs.writeFileSync(localFilePath, fileContent);
 
-        logger.info('Local backup created successfully', {
-          filename,
-          path: localFilePath,
-          doublePlaysCount: data.doublePlays.length,
-          dateRange: `${data.startTime} to ${data.endTime}`
-        });
+            logger.info('Local backup created successfully', {
+              filename,
+              path: localFilePath,
+              doublePlaysCount: data.doublePlays.length,
+              dateRange: `${data.startTime} to ${data.endTime}`
+            });
 
-        results.push('local');
-
-        // Clean up old local backups
-        await this.cleanupOldLocalBackups();
-      } catch (error) {
-        logger.error('Failed to create local backup', {
-          error: error instanceof Error ? error.message : error
-        });
-      }
+            // Clean up old local backups
+            await this.cleanupOldLocalBackups();
+            
+            return { method: 'local', success: true };
+          } catch (error) {
+            logger.error('Failed to create local backup', {
+              error: error instanceof Error ? error.message : error
+            });
+            return { method: 'local', success: false };
+          }
+        })()
+      );
     }
 
-    // Create GitHub backup if enabled
+    // Create GitHub backup if enabled (runs in parallel)
     if (this.isGitHubEnabled) {
-      try {
-        await this.uploadToGitHub(data, fileContent);
-        results.push('github');
-      } catch (error) {
-        logger.error('Failed to create GitHub backup', {
-          error: error instanceof Error ? error.message : error
-        });
-      }
+      logger.info('Starting GitHub backup upload', {
+        repo: `${this.githubOwner}/${this.githubRepo}`,
+        filePath: this.githubFilePath
+      });
+      
+      backupPromises.push(
+        (async () => {
+          try {
+            const startTime = Date.now();
+            
+            // Add timeout protection (10 seconds max for GitHub upload)
+            const timeoutPromise = new Promise<never>((_, reject) => {
+              setTimeout(() => reject(new Error('GitHub upload timeout (10s)')), 10000);
+            });
+            
+            await Promise.race([
+              this.uploadToGitHub(data, fileContent),
+              timeoutPromise
+            ]);
+            
+            const duration = Date.now() - startTime;
+            
+            logger.info('GitHub backup completed', {
+              duration: `${duration}ms`,
+              repo: `${this.githubOwner}/${this.githubRepo}`
+            });
+            
+            return { method: 'github', success: true };
+          } catch (error) {
+            logger.error('Failed to create GitHub backup', {
+              error: error instanceof Error ? error.message : error,
+              note: error instanceof Error && error.message.includes('timeout') 
+                ? 'Consider increasing timeout or disabling GitHub backup for shutdown' 
+                : undefined
+            });
+            return { method: 'github', success: false };
+          }
+        })()
+      );
     }
 
-    if (results.length > 0) {
+    // Wait for all backups to complete
+    const results = await Promise.all(backupPromises);
+    const successfulMethods = results
+      .filter(r => r.success)
+      .map(r => r.method);
+
+    if (successfulMethods.length > 0) {
       logger.info('Backups completed', { 
-        methods: results,
+        methods: successfulMethods,
         filename,
         doublePlaysCount: data.doublePlays.length 
       });
+    } else if (results.length > 0) {
+      logger.warn('All backup methods failed');
     }
   }
 
