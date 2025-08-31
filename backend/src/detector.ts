@@ -11,9 +11,49 @@ export class DoublePlayDetector {
       new Date(a.airdate).getTime() - new Date(b.airdate).getTime()
     );
     
+    // Filter out plays with timestamps that go backwards when sorted by ID
+    // Sort by ID first, then look for time moving backwards
+    const sortedById = [...plays].sort((a, b) => a.play_id - b.play_id);
+    
+    const filteredPlays: KEXPPlay[] = [];
+    let lastTimestamp = 0;
+    let removedCount = 0;
+    
+    for (const play of sortedById) {
+      const currentTimestamp = new Date(play.airdate).getTime();
+      
+      if (currentTimestamp >= lastTimestamp) {
+        filteredPlays.push(play);
+        lastTimestamp = currentTimestamp;
+      } else {
+        removedCount++;
+        logger.debug('Removed play with backwards timestamp', {
+          playId: play.play_id,
+          artist: play.artist,
+          song: play.song,
+          airdate: play.airdate,
+          playType: play.play_type,
+          timestampDiff: currentTimestamp - lastTimestamp
+        });
+      }
+    }
+    
+    if (removedCount > 0) {
+      logger.info('Filtered plays with backwards timestamps', {
+        originalCount: plays.length,
+        filteredCount: filteredPlays.length,
+        removedCount
+      });
+    }
+    
+    // Now sort the filtered plays back by timestamp for detection logic
+    const finalSortedPlays = filteredPlays.sort((a, b) => 
+      new Date(a.airdate).getTime() - new Date(b.airdate).getTime()
+    );
+    
     let i = 0;
-    while (i < sortedPlays.length) {
-      const currentPlay = sortedPlays[i];
+    while (i < finalSortedPlays.length) {
+      const currentPlay = finalSortedPlays[i];
       
       if (currentPlay.play_type !== 'trackplay' || !currentPlay.artist || !currentPlay.song) {
         i++;
@@ -23,8 +63,8 @@ export class DoublePlayDetector {
       const sameSongPlays: KEXPPlay[] = [currentPlay];
       let j = i + 1;
       
-      while (j < sortedPlays.length) {
-        const nextPlay = sortedPlays[j];
+      while (j < finalSortedPlays.length) {
+        const nextPlay = finalSortedPlays[j];
         
         if (nextPlay.play_type === 'trackplay' && 
             this.isSameSong(currentPlay, nextPlay)) {
@@ -53,13 +93,13 @@ export class DoublePlayDetector {
         }
         
         const plays = await Promise.all(sameSongPlays.map(async (play, index) => {
-          // Find the end timestamp by looking at the next item in the sorted plays
-          const playIndex = sortedPlays.indexOf(play);
+          // Find the end timestamp by looking at the next item in the final sorted plays
+          const playIndex = finalSortedPlays.indexOf(play);
           let endTimestamp: string | undefined;
           
           // Look for the next item after this play (could be trackplay or airbreak)
-          if (playIndex < sortedPlays.length - 1) {
-            endTimestamp = sortedPlays[playIndex + 1].airdate;
+          if (playIndex < finalSortedPlays.length - 1) {
+            endTimestamp = finalSortedPlays[playIndex + 1].airdate;
           } else if (chunkEndTime && this.api) {
             // This is the last play in the chunk - try to fetch additional data
             try {
