@@ -250,7 +250,7 @@ export class Scanner {
     }
   }
 
-  stop(): void {
+  async stop(): Promise<void> {
     if (!this.isRunning) {
       return; // Already stopped, prevent duplicate shutdown messages
     }
@@ -266,6 +266,10 @@ export class Scanner {
     
     // Stop the scan queue
     this.scanQueue?.stop();
+    
+    // Perform shutdown backup
+    console.log(chalk.cyan('💾 Creating shutdown backup...'));
+    await this.backupManager.performShutdownBackup(this.data);
     
     // Print final summary
     const totalDoublePlays = this.data.doublePlays.length;

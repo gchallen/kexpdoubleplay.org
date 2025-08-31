@@ -250,6 +250,45 @@ export class BackupManager {
     }
   }
 
+  /**
+   * Perform a backup immediately, regardless of date range changes.
+   * Used for clean shutdown backups.
+   */
+  async performShutdownBackup(data?: DoublePlayData): Promise<void> {
+    if (!this.isGitHubEnabled && !this.isLocalEnabled) {
+      logger.debug('No backup methods enabled - skipping shutdown backup');
+      return;
+    }
+
+    try {
+      // If data is not provided, read from file
+      if (!data) {
+        const dataPath = './double-plays.json';
+        if (!fs.existsSync(dataPath)) {
+          logger.debug('No data file to backup during shutdown');
+          return;
+        }
+        data = JSON.parse(fs.readFileSync(dataPath, 'utf8')) as DoublePlayData;
+      }
+
+      logger.info('Performing shutdown backup', {
+        doublePlaysCount: data.doublePlays.length,
+        dateRange: `${data.startTime} to ${data.endTime}`
+      });
+
+      await this.createBackups(data);
+      
+      // Update the last date range so we don't immediately backup again on next run
+      this.lastDateRange = { start: data.startTime, end: data.endTime };
+      
+      logger.info('Shutdown backup completed successfully');
+    } catch (error) {
+      logger.error('Shutdown backup failed', {
+        error: error instanceof Error ? error.message : error
+      });
+    }
+  }
+
   private shouldBackup(currentRange: { start: string; end: string }): boolean {
     if (!this.lastDateRange) {
       // First run - record current range but don't backup

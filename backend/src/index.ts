@@ -44,9 +44,9 @@ async function main() {
   try {
     await scanner.initialize();
     
-    const gracefulShutdown = (signal: string) => {
+    const gracefulShutdown = async (signal: string) => {
       logger.info('Graceful shutdown initiated', { signal });
-      scanner.stop();
+      await scanner.stop();
       // Give a moment for connections to close, then exit immediately
       setTimeout(() => {
         logger.info('Process exiting');
