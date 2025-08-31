@@ -21,7 +21,7 @@ import {
   type ApiInfoResponse,
   type ErrorResponse,
   type PaginationQuery
-} from './api-schemas';
+} from './api-schemas-local';
 import logger from './logger';
 
 export class ApiServer {
@@ -144,7 +144,7 @@ export class ApiServer {
           status: this.scannerStatus,
           uptime: Math.floor(uptime / 1000), // seconds
           startTime: this.scannerStartTime.toISOString(),
-          lastScanTime: this.lastScanTime?.toISOString() || null,
+          lastScanTime: data.scanStats?.lastScanTime || null,
           lastError: this.lastError,
           retrievalStatus,
           scanner: {
@@ -215,6 +215,7 @@ export class ApiServer {
           startTime: data.startTime,
           endTime: data.endTime,
           totalCount: data.doublePlays.length,
+          counts: data.counts,
           retrievalStatus,
           doublePlays: data.doublePlays,
           metadata: {
