@@ -12,7 +12,32 @@ export class Storage {
     try {
       if (fs.existsSync(this.filePath)) {
         const data = fs.readFileSync(this.filePath, 'utf-8');
-        return JSON.parse(data);
+        const parsedData = JSON.parse(data);
+        
+        // Add counts field if missing (for backward compatibility)
+        if (!parsedData.counts && parsedData.doublePlays) {
+          parsedData.counts = {
+            legitimate: 0,
+            partial: 0,
+            mistake: 0,
+            total: 0
+          };
+
+          // Calculate counts from existing data
+          for (const doublePlay of parsedData.doublePlays) {
+            const classification = doublePlay.classification || 'partial';
+            if (classification === 'legitimate') {
+              parsedData.counts.legitimate++;
+            } else if (classification === 'partial') {
+              parsedData.counts.partial++;
+            } else if (classification === 'mistake') {
+              parsedData.counts.mistake++;
+            }
+            parsedData.counts.total++;
+          }
+        }
+        
+        return parsedData;
       }
     } catch (error) {
       logger.error('Error loading data file', {
@@ -24,7 +49,13 @@ export class Storage {
     return {
       startTime: moment().subtract(1, 'day').toISOString(),
       endTime: moment().toISOString(),
-      doublePlays: []
+      doublePlays: [],
+      counts: {
+        legitimate: 0,
+        partial: 0,
+        mistake: 0,
+        total: 0
+      }
     };
   }
 
@@ -38,11 +69,32 @@ export class Storage {
         fs.mkdirSync(dir, { recursive: true });
       }
       
+      // Calculate classification counts
+      const counts = {
+        legitimate: 0,
+        partial: 0,
+        mistake: 0,
+        total: 0
+      };
+
+      for (const doublePlay of data.doublePlays) {
+        const classification = doublePlay.classification || 'partial'; // Default to partial if missing
+        if (classification === 'legitimate') {
+          counts.legitimate++;
+        } else if (classification === 'partial') {
+          counts.partial++;
+        } else if (classification === 'mistake') {
+          counts.mistake++;
+        }
+        counts.total++;
+      }
+
       const sortedData = {
         ...data,
         doublePlays: [...data.doublePlays].sort((a, b) => 
           new Date(b.plays[0].timestamp).getTime() - new Date(a.plays[0].timestamp).getTime()
-        )
+        ),
+        counts
       };
       
       // Validate the JSON can be serialized and parsed back

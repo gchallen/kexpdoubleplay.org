@@ -41,10 +41,18 @@ export interface ScanStats {
   scanDirection: 'forward' | 'backward' | 'mixed';
 }
 
+export interface ClassificationCounts {
+  legitimate: number;
+  partial: number;
+  mistake: number;
+  total: number;
+}
+
 export interface DoublePlayData {
   startTime: string;
   endTime: string;
   doublePlays: DoublePlay[];
+  counts: ClassificationCounts;
   scanStats?: ScanStats;
 }
 
