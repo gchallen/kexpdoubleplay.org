@@ -40,29 +40,35 @@ async function main() {
   });
   
   const scanner = new Scanner();
+  let isShuttingDown = false;
   
   try {
     await scanner.initialize();
     
     const gracefulShutdown = async (signal: string) => {
+      if (isShuttingDown) {
+        logger.warn('Shutdown already in progress, ignoring signal', { signal });
+        return;
+      }
+      isShuttingDown = true;
+      
       logger.info('Graceful shutdown initiated', { signal });
-      await scanner.stop();
-      // Exit immediately after stop completes (which now includes backup)
-      logger.info('Process exiting');
-      process.exit(0);
+      try {
+        await scanner.stop();
+        logger.info('Process exiting');
+        process.exit(0);
+      } catch (error) {
+        logger.error('Error during shutdown', { error });
+        process.exit(1);
+      }
     };
 
+    // Use setImmediate to ensure async handling works properly
     process.on('SIGINT', () => {
-      gracefulShutdown('SIGINT').catch(error => {
-        logger.error('Error during graceful shutdown', { error });
-        process.exit(1);
-      });
+      setImmediate(() => gracefulShutdown('SIGINT'));
     });
     process.on('SIGTERM', () => {
-      gracefulShutdown('SIGTERM').catch(error => {
-        logger.error('Error during graceful shutdown', { error });
-        process.exit(1);
-      });
+      setImmediate(() => gracefulShutdown('SIGTERM'));
     });
     
     await scanner.start();
