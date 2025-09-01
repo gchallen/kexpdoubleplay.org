@@ -1,11 +1,11 @@
 {
   "name": "kexp-doubleplay",
-  "version": "2025.8.0",
+  "version": "2025.8.1",
   "description": "KEXP Double Play Scanner - Multi-workspace project",
   "private": true,
   "workspaces": [
     "types",
-    "backend", 
+    "backend",
     "frontend"
   ],
   "scripts": {
