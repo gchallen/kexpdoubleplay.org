@@ -19,55 +19,41 @@ This document describes the Docker commands available for the KEXP Double Play S
 - Required before Docker builds
 
 ### `npm run docker:run`
-**Production Docker run** - Builds and runs the production container locally.
+**Build and run locally** - Compiles executable, builds container, and runs it.
 
-- Builds multi-platform container with latest and versioned tags
-- Runs with production configuration
-- Maps port 3000:3000
-- Mounts local `data/` and `logs/` directories
+- Compiles executable for ARM64 musl (Alpine Linux)
+- Builds single-platform container (linux/arm64) for local use
+- Respects `API_PORT` environment variable (defaults to 3000)
+- Mounts local `data/`, `logs/`, and `backups/` directories  
 - Loads environment from `.env` file
-- Uses versioned tag from package.json
-
-### `npm run docker:run:dev`
-**Development Docker run** - Builds and runs a local development container.
-
-- Builds single-platform (amd64) container for faster builds
-- Uses local development tag (`kexp-doubleplay-backend:dev`)
-- Same port mapping and volume mounts as production
-- Ideal for testing Docker builds during development
-
-### `npm run docker:run:local` 
-**Local testing** - Builds and runs with configurable port.
-
-- Respects `API_PORT` environment variable for port mapping
-- Uses local tag (`kexp-doubleplay-backend:local`)
-- Useful when testing different port configurations
+- Simple local development and testing
 
 ### `npm run docker:build`
-**Build only** - Builds the production container without running.
+**Build only** - Compiles and builds the container without running.
 
-- Multi-platform build (linux/amd64, linux/arm64)
-- Creates both `latest` and versioned tags
-- Version automatically read from package.json
+- Same as docker:run but doesn't start the container
+- Creates local `kexp-doubleplay-backend` image
 
 ### `npm run docker:push`
-**Build and push** - Builds and pushes to registry.
+**Build and push to registry** - Builds multi-platform and pushes to Docker Hub.
 
-- Same as docker:build but pushes to Docker registry
-- Requires appropriate Docker registry authentication
+- Builds for both linux/amd64 and linux/arm64 platforms
+- Pushes to geoffreychallen/kexp-doubleplay-backend with latest and version tags
+- Requires Docker registry authentication
 
 ## Volume Mounts
 
-All run commands mount these directories:
+The docker:run command mounts these directories:
 
 - `./data:/app/data` - Scanner data persistence
-- `./logs:/app/logs` - Application logs
+- `./logs:/app/logs` - Application logs  
+- `./backups:/app/backups` - Local backup storage
 - `.env` file - Environment configuration
 
 ## Port Configuration
 
 - Default: Port 3000 (host:container)
-- Override with `API_PORT` environment variable in docker:run:local
+- Override with `API_PORT` environment variable (e.g., `API_PORT=8080 npm run docker:run`)
 - Container always exposes port 3000 internally
 
 ## Environment Variables
@@ -99,19 +85,16 @@ LOG_LEVEL=info
 # Compile standalone executable
 npm run compile
 
-# Run production container locally (compiles first)
+# Build and run container locally
 npm run docker:run
 
-# Run development container for testing (compiles first)
-npm run docker:run:dev
+# Run with custom port  
+API_PORT=8080 npm run docker:run
 
-# Run with custom port (set API_PORT=8080 in .env, compiles first)
-npm run docker:run:local
-
-# Build container only (compiles first)
+# Build container only (without running)
 npm run docker:build
 
-# Build and push to registry (compiles first)
+# Build and push to Docker Hub registry
 npm run docker:push
 ```
 
