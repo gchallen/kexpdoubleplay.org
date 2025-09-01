@@ -2,6 +2,8 @@
 
 This document describes the Docker commands available for the KEXP Double Play Scanner backend.
 
+**Note:** This project uses the Bun runtime (v1.2.20) instead of Node.js for improved performance and compatibility.
+
 ## Available Commands
 
 ### `npm run docker:run`
