@@ -17,7 +17,7 @@
     "test:coverage": "jest --coverage",
     "test:github": "bun src/tests/test-github-setup.ts",
     "test:backup": "bun src/tests/test-backup.ts",
-    "compile": "mkdir -p dist && bun build --compile --target=bun-linux-x64 --outfile=dist/kexp-doubleplay-backend src/index.ts",
+    "compile": "mkdir -p dist && bun build --compile --target=bun-linux-arm64-musl --outfile=dist/kexp-doubleplay-backend src/index.ts",
     "docker:build": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") .",
     "docker:push": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") --push .",
     "docker:dev": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:dev --push .",
