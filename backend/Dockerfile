@@ -1,38 +1,17 @@
-# Build stage using Bun
-FROM oven/bun:1.2.20-alpine AS builder
-
-WORKDIR /app
-
-# Copy package files
-COPY package.json ./
-
-# Install all dependencies (including dev deps for building)
-RUN bun install
-
-# Copy source code
-COPY . .
-
-# Build TypeScript
-RUN bun run build
-
-# Clean install production dependencies only
-RUN rm -rf node_modules && bun install --production
-
-# Runtime stage using Node.js 24.6.0
-FROM node:24-alpine AS runtime
+# Runtime stage - minimal Alpine image
+FROM alpine:latest
 
 # Set working directory
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install basic runtime dependencies
+RUN apk add --no-cache curl ca-certificates
 
-# Copy package files and node_modules from builder
-COPY package.json ./
-COPY --from=builder /app/node_modules ./node_modules
+# Copy the compiled executable (built outside container)
+COPY ./kexp-doubleplay-backend /app/kexp-doubleplay-backend
 
-# Copy built application from builder stage
-COPY --from=builder /app/dist ./dist
+# Make it executable
+RUN chmod +x /app/kexp-doubleplay-backend
 
 # Create non-root user
 RUN addgroup -g 1001 -S nodejs && \
@@ -57,4 +36,4 @@ HEALTHCHECK --interval=30s --timeout=10s --start-period=5s --retries=3 \
   CMD curl -f http://localhost:3000/api/health || exit 1
 
 # Start the application
-CMD ["node", "dist/index.js"]
+CMD ["./kexp-doubleplay-backend"]

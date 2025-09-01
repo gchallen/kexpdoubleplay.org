@@ -17,12 +17,13 @@
     "test:coverage": "jest --coverage",
     "test:github": "bun src/tests/test-github-setup.ts",
     "test:backup": "bun src/tests/test-backup.ts",
-    "docker:build": "docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") .",
-    "docker:push": "docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") --push .",
-    "docker:dev": "docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:dev --push .",
+    "compile": "bun build --compile --target=bun --outfile=kexp-doubleplay-backend src/index.ts",
+    "docker:build": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") .",
+    "docker:push": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") --push .",
+    "docker:dev": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:dev --push .",
     "docker:run": "npm run docker:build && docker run --rm -it --env-file .env -p 3000:3000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs --name kexp-doubleplay-backend geoffreychallen/kexp-doubleplay-backend:latest",
-    "docker:run:dev": "docker buildx build --platform linux/amd64 -t kexp-doubleplay-backend:dev . && docker run --rm -it --env-file .env -p 3000:3000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs --name kexp-doubleplay-backend-dev kexp-doubleplay-backend:dev",
-    "docker:run:local": "docker buildx build --platform linux/amd64 -t kexp-doubleplay-backend:local . && docker run --rm -it --env-file .env -p ${API_PORT:-3000}:${API_PORT:-3000} -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs --name kexp-doubleplay-backend-local kexp-doubleplay-backend:local"
+    "docker:run:dev": "npm run compile && docker buildx build --platform linux/amd64 -t kexp-doubleplay-backend:dev . && docker run --rm -it --env-file .env -p 3000:3000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs --name kexp-doubleplay-backend-dev kexp-doubleplay-backend:dev",
+    "docker:run:local": "npm run compile && docker buildx build --platform linux/amd64 -t kexp-doubleplay-backend:local . && docker run --rm -it --env-file .env -p ${API_PORT:-3000}:${API_PORT:-3000} -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs --name kexp-doubleplay-backend-local kexp-doubleplay-backend:local"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner", "api"],
   "author": "",

@@ -2,11 +2,20 @@
 
 This document describes the Docker commands available for the KEXP Double Play Scanner backend.
 
-**Note:** This project uses a multi-stage Docker build:
-- **Build Stage**: Bun v1.2.20 for fast TypeScript compilation and dependency resolution
-- **Runtime Stage**: Node.js v24 for production execution (matches local Node.js v24.6.0)
+**Note:** This project uses Bun's single-file executable compilation:
+- **Compilation**: Bun v1.2.20 compiles the entire application into a standalone executable outside the container
+- **Runtime**: Minimal Alpine Linux container runs the compiled executable directly
+- **Benefits**: No Node.js/Bun runtime needed in container, faster startup, smaller image size
 
 ## Available Commands
+
+### `npm run compile`
+**Compile executable** - Creates standalone executable using Bun.
+
+- Compiles `src/index.ts` into a single-file executable
+- Includes all dependencies and workspace packages
+- Output: `kexp-doubleplay-backend` executable (added to .gitignore)
+- Required before Docker builds
 
 ### `npm run docker:run`
 **Production Docker run** - Builds and runs the production container locally.
@@ -86,21 +95,36 @@ LOG_LEVEL=info
 ## Examples
 
 ```bash
-# Run production container locally
+# Compile standalone executable
+npm run compile
+
+# Run production container locally (compiles first)
 npm run docker:run
 
-# Run development container for testing
+# Run development container for testing (compiles first)
 npm run docker:run:dev
 
-# Run with custom port (set API_PORT=8080 in .env)
+# Run with custom port (set API_PORT=8080 in .env, compiles first)
 npm run docker:run:local
 
-# Build container only
+# Build container only (compiles first)
 npm run docker:build
 
-# Build and push to registry
+# Build and push to registry (compiles first)
 npm run docker:push
 ```
+
+## Build Process
+
+1. **Compilation**: `bun build --compile` creates a standalone executable containing:
+   - Bundled TypeScript/JavaScript code
+   - All dependencies from package.json
+   - Workspace dependencies (like @kexp-doubleplay/types)
+   - Bun runtime embedded
+
+2. **Docker Build**: Copies the pre-compiled executable into minimal Alpine container
+
+3. **Runtime**: Container executes the standalone binary directly (no Node.js/Bun installation needed)
 
 ## Troubleshooting
 
