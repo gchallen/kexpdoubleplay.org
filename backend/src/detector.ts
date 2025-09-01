@@ -244,21 +244,28 @@ export class DoublePlayDetector {
       const firstDuration = plays[0].duration!;
       const secondDuration = plays[1].duration!;
 
-      if (firstDuration < 30) {
-        // Very short first play - likely a mistake (accidental play)
+      // Check if ANY of the plays are very short (likely a mistake)
+      const hasVeryShortPlay = plays.some(play => play.duration! < 30);
+      if (hasVeryShortPlay) {
+        // Very short play - likely a mistake (accidental play)
         return 'mistake';
-      } 
+      }
       
       // Calculate percentage difference between durations
       const maxDuration = Math.max(firstDuration, secondDuration);
       const minDuration = Math.min(firstDuration, secondDuration);
       const percentDifference = ((maxDuration - minDuration) / maxDuration) * 100;
       
-      if (percentDifference > 10) {
-        // More than 10% difference in duration - likely a partial play that needed restart
+      // Use a more lenient threshold due to data inconsistencies
+      // Only mark as partial if there's a very significant difference (>50%)
+      // OR if the absolute difference is more than 2 minutes AND percentage > 30%
+      const absoluteDifference = maxDuration - minDuration;
+      
+      if (percentDifference > 50 || (absoluteDifference > 120 && percentDifference > 30)) {
+        // Very large difference - likely a partial play that needed restart
         return 'partial';
       } else {
-        // Durations are within 10% of each other - legitimate double play
+        // Durations are reasonably close - legitimate double play
         return 'legitimate';
       }
     } else {

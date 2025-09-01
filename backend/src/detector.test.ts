@@ -245,4 +245,127 @@ describe('DoublePlayDetector', () => {
       expect(merged[0].plays).toHaveLength(3);
     });
   });
+
+  describe('classification', () => {
+    it('should classify Spike Island as legitimate using real KEXP data', async () => {
+      // Use real KEXP API to fetch the Spike Island double play
+      const { KEXPApi } = await import('./api');
+      const moment = (await import('moment')).default;
+      const api = new KEXPApi();
+      const detectorWithApi = new DoublePlayDetector(api);
+      
+      // Fetch real data for the Spike Island double play on April 10, 2025
+      // Use the correct time window from the integration test (8:00-8:20 AM Pacific)
+      const startTime = moment('2025-04-10T08:00:00-07:00');
+      const endTime = moment('2025-04-10T08:20:00-07:00');
+      
+      const plays = await api.getAllPlays(startTime, endTime);
+      
+      // Filter to just the Spike Island plays
+      const spikeIslandPlays = plays.filter(p => 
+        p.artist === 'Pulp' && 
+        p.song === 'Spike Island' &&
+        p.play_type === 'trackplay'
+      );
+      
+      expect(spikeIslandPlays).toHaveLength(2);
+      expect(spikeIslandPlays[0].play_id).toBe(3487084);
+      expect(spikeIslandPlays[1].play_id).toBe(3487086);
+      
+      // Detect double plays with the real data
+      const doublePlays = await detectorWithApi.detectDoublePlays(plays);
+      
+      // Find the Spike Island double play
+      const spikeIsland = doublePlays.find(dp => 
+        dp.artist === 'Pulp' && dp.title === 'Spike Island'
+      );
+      
+      expect(spikeIsland).toBeDefined();
+      expect(spikeIsland!.classification).toBe('legitimate');
+      
+      // Verify the durations are what we expect (~20% difference but still legitimate)
+      const firstDuration = spikeIsland!.plays[0].duration;
+      const secondDuration = spikeIsland!.plays[1].duration;
+      
+      // These should be around 304 and 242 seconds respectively
+      expect(firstDuration).toBeGreaterThan(290);
+      expect(firstDuration).toBeLessThan(320);
+      expect(secondDuration).toBeGreaterThan(230);
+      expect(secondDuration).toBeLessThan(260);
+      
+      // Calculate the percentage difference to verify our logic
+      if (firstDuration && secondDuration) {
+        const maxDuration = Math.max(firstDuration, secondDuration);
+        const minDuration = Math.min(firstDuration, secondDuration);
+        const percentDifference = ((maxDuration - minDuration) / maxDuration) * 100;
+        
+        // Should be around 20% difference
+        expect(percentDifference).toBeGreaterThan(15);
+        expect(percentDifference).toBeLessThan(25);
+        
+        // But still classified as legitimate due to our new threshold
+        expect(spikeIsland!.classification).toBe('legitimate');
+      }
+    }, 30000); // Increase timeout for API call
+
+    it('should classify very short plays as mistakes', async () => {
+      const playsWithDurations = [
+        {
+          timestamp: '2025-07-08T09:33:17-07:00',
+          play_id: 1,
+          duration: 319,
+          kexpPlay: { play_type: 'trackplay' }
+        },
+        {
+          timestamp: '2025-07-08T09:38:36-07:00',
+          play_id: 2,
+          duration: 15, // Very short - likely a mistake
+          kexpPlay: { play_type: 'trackplay' }
+        }
+      ];
+
+      const classification = (detector as any).calculateClassification(playsWithDurations);
+      expect(classification).toBe('mistake');
+    });
+
+    it('should classify large duration differences as partial', async () => {
+      const playsWithDurations = [
+        {
+          timestamp: '2025-07-08T09:00:00-07:00',
+          play_id: 1,
+          duration: 187,
+          kexpPlay: { play_type: 'trackplay' }
+        },
+        {
+          timestamp: '2025-07-08T09:05:00-07:00',
+          play_id: 2,
+          duration: 930, // Very different duration - likely partial play that was restarted
+          kexpPlay: { play_type: 'trackplay' }
+        }
+      ];
+
+      const classification = (detector as any).calculateClassification(playsWithDurations);
+      expect(classification).toBe('partial');
+    });
+
+    it('should classify reasonable duration differences as legitimate', async () => {
+      const playsWithDurations = [
+        {
+          timestamp: '2025-07-08T09:00:00-07:00',
+          play_id: 1,
+          duration: 165,
+          kexpPlay: { play_type: 'trackplay' }
+        },
+        {
+          timestamp: '2025-07-08T09:05:00-07:00',
+          play_id: 2,
+          duration: 196, // ~19% difference, should be legitimate
+          kexpPlay: { play_type: 'trackplay' }
+        }
+      ];
+
+      const classification = (detector as any).calculateClassification(playsWithDurations);
+      expect(classification).toBe('legitimate');
+    });
+  });
 });
