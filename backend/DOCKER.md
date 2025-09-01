@@ -5,18 +5,27 @@ This document describes the Docker commands available for the KEXP Double Play S
 **Note:** This project uses Bun's single-file executable compilation:
 - **Compilation**: Bun v1.2.20 compiles the entire application into a standalone executable outside the container
 - **Runtime**: Minimal Alpine Linux container runs the compiled executable directly
+- **Cross-Platform**: Separate compilation commands for different architectures (ARM64/x64)
 - **Benefits**: No Node.js/Bun runtime needed in container, faster startup, smaller image size
 
 ## Available Commands
 
 ### `npm run compile`
-**Compile executable** - Creates standalone executable using Bun.
+**Compile executable (ARM64)** - Creates standalone executable for ARM64 architecture.
 
-- Compiles `src/index.ts` into a single-file executable for Alpine Linux ARM64
-- Includes all dependencies and workspace packages
+- Compiles `src/index.ts` for Alpine Linux ARM64 using `--target=bun-linux-arm64-musl`
+- Same as `npm run compile:arm64`
+
+### `npm run compile:arm64`
+**Compile for ARM64** - Creates ARM64 musl executable.
+
+### `npm run compile:x64`  
+**Compile for x64** - Creates x64 musl executable.
+
+**All compile commands:**
+- Include all dependencies and workspace packages
 - Output: `dist/kexp-doubleplay-backend` executable (dist/ in .gitignore)
-- Cross-compiles from macOS to Alpine Linux using `--target=bun-linux-arm64-musl`
-- Required before Docker builds
+- Cross-compile from macOS to Alpine Linux
 
 ### `npm run docker:run`
 **Build and run locally** - Compiles executable, builds container, and runs it.

@@ -18,9 +18,11 @@
     "test:github": "bun src/tests/test-github-setup.ts",
     "test:backup": "bun src/tests/test-backup.ts",
     "compile": "mkdir -p dist && bun build --compile --target=bun-linux-arm64-musl --outfile=dist/kexp-doubleplay-backend src/index.ts",
+    "compile:arm64": "mkdir -p dist && bun build --compile --target=bun-linux-arm64-musl --outfile=dist/kexp-doubleplay-backend src/index.ts",
+    "compile:x64": "mkdir -p dist && bun build --compile --target=bun-linux-x64-musl --outfile=dist/kexp-doubleplay-backend src/index.ts",
     "docker:build": "npm run compile && docker buildx build --platform linux/arm64 -t kexp-doubleplay-backend .",
     "docker:run": "npm run docker:build && docker run --rm -it --env-file .env -p ${API_PORT:-3000}:3000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs -v $(pwd)/backups:/app/backups --name kexp-doubleplay-backend kexp-doubleplay-backend",
-    "docker:push": "npm run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/kexp-doubleplay-backend:latest -t geoffreychallen/kexp-doubleplay-backend:$(node -p \"require('./package.json').version\") --push ."
+    "docker:push": "echo 'Multi-architecture push requires separate compilation per platform. Use docker:push:script or manually compile for each arch.'"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner", "api"],
   "author": "",
