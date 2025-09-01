@@ -8,7 +8,8 @@ WORKDIR /app
 RUN apk add --no-cache curl ca-certificates libstdc++ libgcc
 
 # Copy the compiled executable (built outside container)
-COPY ./dist/kexp-doubleplay-backend /app/kexp-doubleplay-backend
+ARG TARGETPLATFORM
+COPY ./dist/kexp-doubleplay-backend-${TARGETPLATFORM##*/} /app/kexp-doubleplay-backend
 
 # Make it executable
 RUN chmod +x /app/kexp-doubleplay-backend
