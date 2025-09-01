@@ -4,8 +4,8 @@ FROM alpine:latest
 # Set working directory
 WORKDIR /app
 
-# Install basic runtime dependencies
-RUN apk add --no-cache curl ca-certificates
+# Install basic runtime dependencies and C++ standard library
+RUN apk add --no-cache curl ca-certificates libstdc++ libgcc
 
 # Copy the compiled executable (built outside container)
 COPY ./dist/kexp-doubleplay-backend /app/kexp-doubleplay-backend
@@ -17,8 +17,8 @@ RUN chmod +x /app/kexp-doubleplay-backend
 RUN addgroup -g 1001 -S nodejs && \
     adduser -S scanner -u 1001
 
-# Create data directory and set permissions
-RUN mkdir -p /app/data && chown scanner:nodejs /app/data
+# Create data, logs, and backups directories and set permissions
+RUN mkdir -p /app/data /app/logs /app/backups && chown scanner:nodejs /app/data /app/logs /app/backups
 
 # Switch to non-root user
 USER scanner
