@@ -15,22 +15,21 @@ COPY . .
 # Build TypeScript
 RUN bun run build
 
+# Clean install production dependencies only
+RUN rm -rf node_modules && bun install --production
+
 # Runtime stage using Node.js 24.6.0
 FROM node:24-alpine AS runtime
 
 # Set working directory
 WORKDIR /app
 
-# Install curl and Bun for dependency management
-RUN apk add --no-cache curl unzip && \
-    curl -fsSL https://bun.sh/install | bash && \
-    ln -s ~/.bun/bin/bun /usr/local/bin/bun
+# Install curl for health checks
+RUN apk add --no-cache curl
 
-# Copy package files
+# Copy package files and node_modules from builder
 COPY package.json ./
-
-# Install only production dependencies using Bun
-RUN bun install --production
+COPY --from=builder /app/node_modules ./node_modules
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
