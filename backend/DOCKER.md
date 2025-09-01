@@ -12,9 +12,10 @@ This document describes the Docker commands available for the KEXP Double Play S
 ### `npm run compile`
 **Compile executable** - Creates standalone executable using Bun.
 
-- Compiles `src/index.ts` into a single-file executable
+- Compiles `src/index.ts` into a single-file executable for Linux x64
 - Includes all dependencies and workspace packages
-- Output: `kexp-doubleplay-backend` executable (added to .gitignore)
+- Output: `dist/kexp-doubleplay-backend` executable (dist/ in .gitignore)
+- Cross-compiles from macOS to Linux using `--target=bun-linux-x64`
 - Required before Docker builds
 
 ### `npm run docker:run`
