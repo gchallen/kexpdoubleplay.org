@@ -35,6 +35,13 @@ export class BackupManager {
 
     if (!this.isGitHubEnabled && !this.isLocalEnabled) {
       logger.warn('No backup methods enabled - data will not be backed up');
+    } else {
+      if (!this.isLocalEnabled) {
+        logger.info('Local backups disabled - LOCAL_BACKUP_PATH not set');
+      }
+      if (!this.isGitHubEnabled) {
+        logger.info('GitHub backups disabled - required environment variables not set');
+      }
     }
 
     if (this.isGitHubEnabled && (!this.githubToken || !this.githubOwner || !this.githubRepo)) {
