@@ -21,14 +21,16 @@ FROM node:24-alpine AS runtime
 # Set working directory
 WORKDIR /app
 
-# Install curl for health checks
-RUN apk add --no-cache curl
+# Install curl and Bun for dependency management
+RUN apk add --no-cache curl unzip && \
+    curl -fsSL https://bun.sh/install | bash && \
+    ln -s ~/.bun/bin/bun /usr/local/bin/bun
 
 # Copy package files
 COPY package.json ./
 
-# Install only production dependencies
-RUN npm ci --only=production && npm cache clean --force
+# Install only production dependencies using Bun
+RUN bun install --production
 
 # Copy built application from builder stage
 COPY --from=builder /app/dist ./dist
