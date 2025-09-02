@@ -1,0 +1,57 @@
+@tailwind base;
+@tailwind components;
+@tailwind utilities;
+
+/* KEXP-style base styles */
+body {
+  font-family: Arial, Helvetica, sans-serif;
+  background-color: #000;
+  color: #fff;
+  margin: 0;
+  padding: 0;
+}
+
+/* KEXP-style components */
+.playlist-item {
+  display: flex;
+  align-items: center;
+  padding: 12px 0;
+  border-bottom: 1px solid #333;
+}
+
+.album-cover {
+  width: 60px;
+  height: 60px;
+  object-fit: cover;
+  margin-right: 16px;
+}
+
+.track-info {
+  flex: 1;
+}
+
+.artist-name {
+  font-weight: normal;
+  font-size: 16px;
+  margin: 0 0 4px 0;
+}
+
+.track-title {
+  font-weight: 300;
+  font-style: italic;
+  font-size: 14px;
+  color: #ccc;
+  margin: 0 0 4px 0;
+}
+
+.album-name {
+  font-size: 12px;
+  color: #999;
+  margin: 0;
+}
+
+.timestamp {
+  font-size: 12px;
+  color: #666;
+  margin-left: 16px;
+}
