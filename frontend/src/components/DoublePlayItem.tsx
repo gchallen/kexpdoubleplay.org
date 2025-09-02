@@ -9,8 +9,9 @@ export const DoublePlayItem: React.FC<DoublePlayItemProps> = ({ doublePlay }) =>
   const firstPlay = doublePlay.plays[0];
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('en-US', {
-      month: 'short',
-      day: 'numeric',
+      month: '2-digit',
+      day: '2-digit',
+      year: 'numeric',
       hour: 'numeric',
       minute: '2-digit',
       hour12: true
@@ -24,7 +25,28 @@ export const DoublePlayItem: React.FC<DoublePlayItemProps> = ({ doublePlay }) =>
   return (
     <div className="playlist-item">
       <div className="flex items-center w-full">
-        <div className="timestamp text-xs text-gray-400 w-24 shrink-0">
+        {/* Play button */}
+        {doublePlay.youtube && (
+          <div className="shrink-0 mr-3">
+            <a 
+              href={doublePlay.youtube.url}
+              target="_blank"
+              rel="noopener noreferrer"
+              className="group flex items-center justify-center w-8 h-8 bg-white hover:bg-gray-100 rounded-full border-2 border-white hover:border-gray-100 transition-all duration-200"
+              title="Watch on YouTube"
+            >
+              <svg 
+                className="w-3 h-3 text-black ml-0.5 group-hover:text-gray-800" 
+                fill="currentColor" 
+                viewBox="0 0 24 24"
+              >
+                <path d="M8 5v14l11-7z"/>
+              </svg>
+            </a>
+          </div>
+        )}
+
+        <div className="timestamp text-xs text-gray-400 w-32 shrink-0">
           {formatTime(firstPlay.timestamp)}
         </div>
         
@@ -41,18 +63,6 @@ export const DoublePlayItem: React.FC<DoublePlayItemProps> = ({ doublePlay }) =>
               <span className="ml-2">
                 • {doublePlay.dj} on {doublePlay.show}
               </span>
-            )}
-            {doublePlay.youtube && (
-              <div className="mt-1">
-                <a 
-                  href={doublePlay.youtube.url}
-                  target="_blank"
-                  rel="noopener noreferrer"
-                  className="text-blue-400 hover:text-blue-300 text-xs"
-                >
-                  ▶ Watch on YouTube
-                </a>
-              </div>
             )}
           </div>
         </div>

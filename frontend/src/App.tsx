@@ -40,7 +40,14 @@ const App: React.FC = () => {
               <span>{data.totalCount} double plays found</span>
               {lastUpdate && (
                 <span className="ml-4">
-                  Enhanced: {lastUpdate.toLocaleString()}
+                  Enhanced: {lastUpdate.toLocaleString('en-US', {
+                    month: '2-digit',
+                    day: '2-digit', 
+                    year: 'numeric',
+                    hour: 'numeric',
+                    minute: '2-digit',
+                    hour12: true
+                  })}
                 </span>
               )}
             </div>
