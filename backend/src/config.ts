@@ -1,4 +1,4 @@
-import { Config } from './types';
+import { Config } from '@kexp-doubleplay/types';
 import * as path from 'path';
 
 export const config: Config = {
@@ -8,5 +8,5 @@ export const config: Config = {
   scanIntervalMinutes: parseFloat(process.env.SCAN_INTERVAL_MINUTES || '5'),
   maxHoursPerRequest: parseInt(process.env.MAX_HOURS_PER_REQUEST || '1', 10),
   apiPort: parseInt(process.env.API_PORT || '3000', 10),
-  historicalScanStopDate: process.env.HISTORICAL_SCAN_STOP_DATE, // Optional: YYYY-MM-DD format, e.g., "2020-01-01"
+  historicalScanStopDate: process.env.HISTORICAL_SCAN_STOP_DATE // Optional: YYYY-MM-DD format, e.g., "2020-01-01"
 };

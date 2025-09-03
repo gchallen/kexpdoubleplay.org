@@ -11,7 +11,7 @@ import { DoublePlayDetector } from './detector';
 import { Storage } from './storage';
 import { BackupManager } from './backup-manager';
 import { config } from './config';
-import { DoublePlayData, ScanStats } from './types';
+import { DoublePlayData, ScanStats } from '@kexp-doubleplay/types';
 import { ApiServer } from './api-server';
 import { ScanQueue } from './scan-queue';
 import logger from './logger';
@@ -35,7 +35,12 @@ export class Scanner {
     this.data = {
       startTime: moment().subtract(7, 'days').toISOString(),
       endTime: moment().toISOString(),
-      doublePlays: []
+      doublePlays: [],
+      counts: {
+        legitimate: 0,
+        partial: 0,
+        mistake: 0
+      }
     };
   }
 
@@ -131,7 +136,12 @@ export class Scanner {
       this.data = {
         startTime: moment().subtract(7, 'days').toISOString(),
         endTime: moment().toISOString(),
-        doublePlays: []
+        doublePlays: [],
+        counts: {
+          legitimate: 0,
+          partial: 0,
+          mistake: 0
+        }
       };
       dataSource = 'fresh start (no existing data)';
       logger.info('Starting with fresh data - no local file or backup found');
@@ -188,6 +198,7 @@ export class Scanner {
     this.backupCheckTask.start();
     logger.debug('Backup check scheduled every 10 minutes');
   }
+
 
   private updateScanStats(direction: 'forward' | 'backward' | 'mixed', scanTimeMs: number, requestCount: number): void {
     const now = moment().toISOString();

@@ -2,7 +2,7 @@ import fs from 'fs';
 import path from 'path';
 import moment from 'moment';
 import fetch from 'node-fetch';
-import { DoublePlayData } from './types';
+import { DoublePlayData } from '@kexp-doubleplay/types';
 import logger from './logger';
 
 interface GitHubFileResponse {
@@ -474,7 +474,7 @@ export class BackupManager {
     const uploadResult = await uploadResponse.json();
     
     logger.info('GitHub backup created successfully', {
-      commitSha: uploadResult.commit?.sha,
+      commitSha: (uploadResult as any).commit?.sha,
       commitMessage,
       doublePlaysCount,
       dateRange: `${data.startTime} to ${data.endTime}`,

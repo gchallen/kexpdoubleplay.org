@@ -3,7 +3,7 @@ import moment from 'moment';
 import * as os from 'os';
 import { Storage } from './storage';
 import { config } from './config';
-import { DoublePlayData } from './types';
+import { DoublePlayData, DoublePlay } from '@kexp-doubleplay/types';
 import { KEXPApi } from './api';
 import { ScanQueue } from './scan-queue';
 import {
@@ -21,7 +21,7 @@ import {
   type ApiInfoResponse,
   type ErrorResponse,
   type PaginationQuery
-} from './api-schemas-local';
+} from '@kexp-doubleplay/types';
 import logger from './logger';
 
 export class ApiServer {
@@ -299,7 +299,7 @@ export class ApiServer {
         const showCounts: { [key: string]: number } = {};
         const playCountDistribution: { [key: number]: number } = {};
 
-        data.doublePlays.forEach(dp => {
+        data.doublePlays.forEach((dp: DoublePlay) => {
           // Artist stats
           artistCounts[dp.artist] = (artistCounts[dp.artist] || 0) + 1;
           

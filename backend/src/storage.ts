@@ -1,6 +1,6 @@
 import * as fs from 'fs';
 import * as path from 'path';
-import { DoublePlayData } from './types';
+import { DoublePlayData } from '@kexp-doubleplay/types';
 import moment from 'moment';
 import logger from './logger';
 import { DoublePlaySchema, ScanStatsSchema } from '@kexp-doubleplay/types';
@@ -53,8 +53,7 @@ export class Storage {
       counts: {
         legitimate: 0,
         partial: 0,
-        mistake: 0,
-        total: 0
+        mistake: 0
       }
     };
   }
@@ -152,7 +151,7 @@ export class Storage {
           });
           
           // Check for specific common issues
-          const hasNullAlbum = doublePlay.plays?.some(play => play.kexpPlay?.album === null);
+          const hasNullAlbum = doublePlay.plays?.some((play: any) => play.kexpPlay?.album === null);
           if (hasNullAlbum) {
             logger.error('VALIDATION FAILURE: Album field contains null value', {
               artist: doublePlay.artist,

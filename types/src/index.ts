@@ -127,10 +127,17 @@ export const MetadataSchema = z.object({
   timeRange: TimeRangeSchema
 });
 
+export const ClassificationCountsSchema = z.object({
+  legitimate: z.number(),
+  partial: z.number(), 
+  mistake: z.number()
+});
+
 export const DoubleePlaysResponseSchema = z.object({
   startTime: z.string(),
   endTime: z.string(),
   totalCount: z.number(),
+  counts: ClassificationCountsSchema,
   retrievalStatus: z.string(),
   doublePlays: z.array(DoublePlaySchema),
   metadata: MetadataSchema
@@ -208,6 +215,25 @@ export const PaginationQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(10)
 });
 
+// Backend-specific schemas
+export const DoublePlayDataSchema = z.object({
+  startTime: z.string(),
+  endTime: z.string(),
+  doublePlays: z.array(DoublePlaySchema),
+  counts: ClassificationCountsSchema,
+  scanStats: ScanStatsSchema.optional()
+});
+
+export const ConfigSchema = z.object({
+  dataFilePath: z.string(),
+  apiBaseUrl: z.string(),
+  apiPort: z.number(),
+  rateLimitDelay: z.number(),
+  scanIntervalMinutes: z.number(),
+  maxHoursPerRequest: z.number(),
+  historicalScanStopDate: z.string().optional()
+});
+
 // TypeScript type exports
 export type KEXPPlay = z.infer<typeof KEXPPlaySchema>;
 export type Play = z.infer<typeof PlaySchema>;
@@ -232,3 +258,6 @@ export type StatsResponse = z.infer<typeof StatsResponseSchema>;
 export type ApiInfoResponse = z.infer<typeof ApiInfoResponseSchema>;
 export type ErrorResponse = z.infer<typeof ErrorResponseSchema>;
 export type PaginationQuery = z.infer<typeof PaginationQuerySchema>;
+export type ClassificationCounts = z.infer<typeof ClassificationCountsSchema>;
+export type DoublePlayData = z.infer<typeof DoublePlayDataSchema>;
+export type Config = z.infer<typeof ConfigSchema>;

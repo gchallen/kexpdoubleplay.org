@@ -1,4 +1,4 @@
-import { KEXPPlay, DoublePlay } from './types';
+import { KEXPPlay, DoublePlay } from '@kexp-doubleplay/types';
 import { KEXPApi } from './api';
 import logger from './logger';
 import moment from 'moment';

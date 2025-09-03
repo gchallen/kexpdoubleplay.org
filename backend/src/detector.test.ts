@@ -1,5 +1,5 @@
 import { DoublePlayDetector } from './detector';
-import { KEXPPlay, DoublePlay } from './types';
+import { KEXPPlay, DoublePlay } from '@kexp-doubleplay/types';
 
 describe('DoublePlayDetector', () => {
   let detector: DoublePlayDetector;

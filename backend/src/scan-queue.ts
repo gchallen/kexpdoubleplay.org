@@ -3,7 +3,7 @@ import { KEXPApi } from './api';
 import { DoublePlayDetector } from './detector';
 import { Storage } from './storage';
 import { config } from './config';
-import { DoublePlayData } from './types';
+import { DoublePlayData } from '@kexp-doubleplay/types';
 import { ProgressMonitor } from './progress-monitor';
 import { ScannerStateManager } from './scanner-state';
 import logger from './logger';
@@ -310,7 +310,7 @@ export class ScanQueue {
 
       if (newDoublePlays.length > 0) {
         this.data.doublePlays.push(...newDoublePlays);
-        this.data.doublePlays.sort((a, b) => new Date(a.plays[0].timestamp).getTime() - new Date(b.plays[0].timestamp).getTime());
+        this.data.doublePlays.sort((a: any, b: any) => new Date(a.plays[0].timestamp).getTime() - new Date(b.plays[0].timestamp).getTime());
         
         logger.info('Double play detected', {
           artist: newDoublePlays[0].artist,

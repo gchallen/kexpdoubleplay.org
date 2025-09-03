@@ -1,7 +1,7 @@
 import moment from 'moment';
 import * as cliProgress from 'cli-progress';
 import chalk from 'chalk';
-import { DoublePlayData } from './types';
+import { DoublePlayData } from '@kexp-doubleplay/types';
 import { ScannerStateManager } from './scanner-state';
 import { config } from './config';
 import logger from './logger';

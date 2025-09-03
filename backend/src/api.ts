@@ -2,7 +2,7 @@ import fetch from 'node-fetch';
 import * as http from 'http';
 import * as https from 'https';
 import moment from 'moment';
-import { KEXPPlay } from './types';
+import { KEXPPlay } from '@kexp-doubleplay/types';
 import { config } from './config';
 import logger from './logger';
 
@@ -85,15 +85,22 @@ export class KEXPApi {
     const requestStartTime = Date.now();
     
     try {
+      // Create controller for timeout
+      const controller = new AbortController();
+      const timeoutId = setTimeout(() => controller.abort(), 30000);
+      
       const response = await fetch(url, {
         agent: agent,
-        timeout: 30000, // 30 second request timeout
+        signal: controller.signal,
         headers: {
           'User-Agent': 'KEXP-DoublePlay-Scanner/1.0',
           'Accept': 'application/json',
           'Connection': 'keep-alive'
         }
       });
+      
+      // Clear timeout since request succeeded
+      clearTimeout(timeoutId);
       
       // Increment total request counter
       this.totalRequests++;
