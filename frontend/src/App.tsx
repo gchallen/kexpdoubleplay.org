@@ -42,33 +42,32 @@ const App: React.FC = () => {
             </div>
             <ThemeToggle />
           </div>
-          {data && (
-            <div className="mt-4 text-sm text-gray-500 dark:text-gray-400">
-              <span>{data.totalCount} double plays found</span>
-              {lastUpdate && (
-                <span className="ml-4">
-                  Enhanced: {lastUpdate.toLocaleString('en-US', {
-                    month: '2-digit',
-                    day: '2-digit', 
-                    year: 'numeric',
-                    hour: 'numeric',
-                    minute: '2-digit',
-                    hour12: true
-                  })}
-                </span>
-              )}
-            </div>
-          )}
         </header>
 
         <main>
-          {data && data.doublePlays.length > 0 ? (
-            <div className="space-y-0">
-              {data.doublePlays.map((doublePlay, index) => (
-                <DoublePlayItem key={`${doublePlay.plays[0].play_id}-${index}`} doublePlay={doublePlay} />
-              ))}
-            </div>
-          ) : (
+          {data && data.doublePlays.length > 0 ? (() => {
+            // Filter to only legitimate double plays and sort by timestamp (oldest first)
+            const legitimateDoublePlays = data.doublePlays
+              .filter(doublePlay => doublePlay.classification === 'legitimate')
+              .sort((a, b) => new Date(a.plays[0].timestamp).getTime() - new Date(b.plays[0].timestamp).getTime());
+
+            return legitimateDoublePlays.length > 0 ? (
+              <div className="space-y-0">
+                {legitimateDoublePlays.map((doublePlay, index) => (
+                  <DoublePlayItem 
+                    key={`${doublePlay.plays[0].play_id}-${index}`} 
+                    doublePlay={doublePlay}
+                    number={index + 1}
+                  />
+                ))}
+              </div>
+            ) : (
+              <div className="text-center text-gray-600 dark:text-gray-400 py-16">
+                <div className="text-xl mb-2">No legitimate double plays found</div>
+                <div>Check back later for more discoveries</div>
+              </div>
+            );
+          })() : (
             <div className="text-center text-gray-600 dark:text-gray-400 py-16">
               <div className="text-xl mb-2">No double plays found</div>
               <div>Check back later for more discoveries</div>

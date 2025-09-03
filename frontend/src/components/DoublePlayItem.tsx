@@ -3,9 +3,10 @@ import { EnhancedDoublePlay } from '../hooks/useEnhancedData';
 
 interface DoublePlayItemProps {
   doublePlay: EnhancedDoublePlay;
+  number: number;
 }
 
-export const DoublePlayItem: React.FC<DoublePlayItemProps> = ({ doublePlay }) => {
+export const DoublePlayItem: React.FC<DoublePlayItemProps> = ({ doublePlay, number }) => {
   const firstPlay = doublePlay.plays[0];
   const formatTime = (timestamp: string) => {
     return new Date(timestamp).toLocaleString('en-US', {
@@ -25,6 +26,13 @@ export const DoublePlayItem: React.FC<DoublePlayItemProps> = ({ doublePlay }) =>
   return (
     <div className="playlist-item">
       <div className="flex items-center w-full">
+        {/* Track number */}
+        <div className="shrink-0 mr-4 w-8 text-right">
+          <span className="text-sm font-mono text-gray-500 dark:text-gray-400">
+            {number}.
+          </span>
+        </div>
+
         {/* KEXP-style play button */}
         {doublePlay.youtube && (
           <div className="shrink-0 mr-3">
