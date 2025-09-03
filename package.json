@@ -12,9 +12,18 @@
     "backend": "bun --filter=backend dev",
     "frontend": "bun --filter=frontend dev",
     "build": "bun --filter=backend build && bun --filter=frontend build",
-    "test": "bun --filter=backend test && bun --filter=frontend test"
+    "test": "bun --filter=backend test && bun --filter=frontend test",
+    "update-youtube": "bun run scripts/update-youtube-urls.ts"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner"],
   "author": "",
-  "license": "ISC"
+  "license": "ISC",
+  "dependencies": {
+    "dotenv": "^17.2.2",
+    "puppeteer": "^24.18.0",
+    "yaml": "^2.8.1"
+  },
+  "devDependencies": {
+    "@types/yaml": "^1.9.7"
+  }
 }
