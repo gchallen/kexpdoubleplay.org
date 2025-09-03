@@ -46,10 +46,12 @@ const App: React.FC = () => {
 
         <main>
           {data && data.doublePlays.length > 0 ? (() => {
-            // Filter to only legitimate double plays and sort by timestamp (oldest first)
+            // Filter to only legitimate double plays and sort by timestamp (newest first)
             const legitimateDoublePlays = data.doublePlays
               .filter(doublePlay => doublePlay.classification === 'legitimate')
-              .sort((a, b) => new Date(a.plays[0].timestamp).getTime() - new Date(b.plays[0].timestamp).getTime());
+              .sort((a, b) => new Date(b.plays[0].timestamp).getTime() - new Date(a.plays[0].timestamp).getTime());
+
+            const totalCount = legitimateDoublePlays.length;
 
             return legitimateDoublePlays.length > 0 ? (
               <div className="space-y-0">
@@ -57,7 +59,7 @@ const App: React.FC = () => {
                   <DoublePlayItem 
                     key={`${doublePlay.plays[0].play_id}-${index}`} 
                     doublePlay={doublePlay}
-                    number={index + 1}
+                    number={totalCount - index}
                   />
                 ))}
               </div>
