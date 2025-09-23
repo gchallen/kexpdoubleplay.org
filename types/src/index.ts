@@ -34,7 +34,8 @@ export const DoublePlaySchema = z.object({
   plays: z.array(PlaySchema),
   dj: z.string().optional(),
   show: z.string().optional(),
-  classification: z.enum(['legitimate', 'partial', 'mistake']).optional()
+  classification: z.enum(['legitimate', 'partial', 'mistake']).optional(),
+  youtube_id: z.string().optional()
 });
 
 export const ScanStatsSchema = z.object({
