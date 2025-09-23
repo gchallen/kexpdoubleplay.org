@@ -10,6 +10,7 @@ import { KEXPApi } from './api';
 import { DoublePlayDetector } from './detector';
 import { Storage } from './storage';
 import { BackupManager } from './backup-manager';
+import { YouTubeManager } from './youtube-manager';
 import { config } from './config';
 import { DoublePlayData, ScanStats } from '@kexp-doubleplay/types';
 import { ApiServer } from './api-server';
@@ -21,17 +22,20 @@ export class Scanner {
   private detector: DoublePlayDetector;
   private storage: Storage;
   private backupManager: BackupManager;
+  private youtubeManager: YouTubeManager;
   private data: DoublePlayData;
   private isRunning = false;
   private apiServer?: ApiServer;
   private scanQueue?: ScanQueue;
   private backupCheckTask?: cron.ScheduledTask;
+  private youtubeUpdateTask?: cron.ScheduledTask;
 
   constructor() {
     this.api = new KEXPApi();
     this.detector = new DoublePlayDetector(this.api);
     this.storage = new Storage(config.dataFilePath);
     this.backupManager = new BackupManager();
+    this.youtubeManager = new YouTubeManager();
     this.data = {
       startTime: moment().subtract(7, 'days').toISOString(),
       endTime: moment().toISOString(),
@@ -178,7 +182,7 @@ export class Scanner {
     
     // Start API server
     const apiPort = parseInt(process.env.API_PORT || '3000', 10);
-    this.apiServer = new ApiServer(apiPort, this.api);
+    this.apiServer = new ApiServer(apiPort, this.api, undefined, this.youtubeManager);
     await this.apiServer.start();
     console.log(chalk.dim(`   API server: http://localhost:${apiPort}\n`));
     logger.debug('API server started', { port: apiPort });
@@ -197,6 +201,22 @@ export class Scanner {
     // Start the backup check task
     this.backupCheckTask.start();
     logger.debug('Backup check scheduled every 10 minutes');
+
+    // Schedule periodic YouTube data updates (every 5 minutes)
+    this.youtubeUpdateTask = cron.schedule('*/5 * * * *', async () => {
+      try {
+        await this.youtubeManager.updateYouTubeData();
+      } catch (error) {
+        logger.error('YouTube data update failed', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    });
+
+    // Start the YouTube update task and perform initial update
+    this.youtubeUpdateTask.start();
+    await this.youtubeManager.updateYouTubeData(); // Initial update
+    logger.debug('YouTube data update scheduled every 5 minutes');
   }
 
 
@@ -273,6 +293,12 @@ export class Scanner {
     if (this.backupCheckTask) {
       this.backupCheckTask.stop();
       logger.debug('Stopped backup check task');
+    }
+
+    // Stop YouTube update task
+    if (this.youtubeUpdateTask) {
+      this.youtubeUpdateTask.stop();
+      logger.debug('Stopped YouTube update task');
     }
     
     // Stop the scan queue

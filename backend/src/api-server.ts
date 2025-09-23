@@ -2,6 +2,7 @@ import express from 'express';
 import moment from 'moment';
 import * as os from 'os';
 import { Storage } from './storage';
+import { YouTubeManager } from './youtube-manager';
 import { config } from './config';
 import { DoublePlayData, DoublePlay } from '@kexp-doubleplay/types';
 import { KEXPApi } from './api';
@@ -28,14 +29,16 @@ export class ApiServer {
   private app: express.Application;
   private server: any;
   private storage: Storage;
+  private youtubeManager?: YouTubeManager;
   private scannerStartTime: Date;
   private lastScanTime: Date | null = null;
   private scannerStatus: 'starting' | 'running' | 'stopped' | 'error' = 'starting';
   private lastError: string | null = null;
 
-  constructor(private port: number = 3000, private api?: KEXPApi, private scanQueue?: ScanQueue) {
+  constructor(private port: number = 3000, private api?: KEXPApi, private scanQueue?: ScanQueue, youtubeManager?: YouTubeManager) {
     this.app = express();
     this.storage = new Storage(config.dataFilePath);
+    this.youtubeManager = youtubeManager;
     this.scannerStartTime = new Date();
     this.setupMiddleware();
     this.setupRoutes();
@@ -161,6 +164,12 @@ export class ApiServer {
             consecutiveFailures: apiHealthStatus.consecutiveFailures,
             lastFailureTime: apiHealthStatus.lastFailureTime ? new Date(apiHealthStatus.lastFailureTime).toISOString() : null
           },
+          youtube: this.youtubeManager ? this.youtubeManager.getStatus() : {
+            enabled: false,
+            lastUpdate: null,
+            entriesCount: 0,
+            isStale: false
+          },
           system: {
             nodeVersion: process.version,
             platform: process.platform,
@@ -195,6 +204,7 @@ export class ApiServer {
     this.app.get('/api/double-plays', async (req, res) => {
       try {
         const data = await this.storage.load();
+        const enrichedData = await this.enrichDataWithYouTube(data);
         
         // Get KEXP API health status
         const apiHealthStatus = this.api?.getHealthStatus() || {
@@ -212,12 +222,12 @@ export class ApiServer {
         }
         
         const response: DoubleePlaysResponse = {
-          startTime: data.startTime,
-          endTime: data.endTime,
-          totalCount: data.doublePlays.length,
-          counts: data.counts,
+          startTime: enrichedData.startTime,
+          endTime: enrichedData.endTime,
+          totalCount: enrichedData.doublePlays.length,
+          counts: enrichedData.counts,
           retrievalStatus,
-          doublePlays: data.doublePlays,
+          doublePlays: enrichedData.doublePlays,
           metadata: {
             generatedAt: new Date().toISOString(),
             retrievalStatus,
@@ -226,9 +236,9 @@ export class ApiServer {
               consecutiveFailures: apiHealthStatus.consecutiveFailures
             },
             timeRange: {
-              earliest: data.startTime,
-              latest: data.endTime,
-              durationDays: moment(data.endTime).diff(moment(data.startTime), 'days')
+              earliest: enrichedData.startTime,
+              latest: enrichedData.endTime,
+              durationDays: moment(enrichedData.endTime).diff(moment(enrichedData.startTime), 'days')
             }
           }
         };
@@ -257,24 +267,25 @@ export class ApiServer {
         }
 
         const data = await this.storage.load();
+        const enrichedData = await this.enrichDataWithYouTube(data);
         const page = queryParams.page;
         const limit = queryParams.limit;
         const offset = (page - 1) * limit;
 
-        const paginatedPlays = data.doublePlays.slice(offset, offset + limit);
-        const totalPages = Math.ceil(data.doublePlays.length / limit);
+        const paginatedPlays = enrichedData.doublePlays.slice(offset, offset + limit);
+        const totalPages = Math.ceil(enrichedData.doublePlays.length / limit);
 
         const response: PaginatedResponse = {
           page,
           limit,
-          totalCount: data.doublePlays.length,
+          totalCount: enrichedData.doublePlays.length,
           totalPages,
           hasNext: page < totalPages,
           hasPrevious: page > 1,
           doublePlays: paginatedPlays,
           timeRange: {
-            earliest: data.startTime,
-            latest: data.endTime
+            earliest: enrichedData.startTime,
+            latest: enrichedData.endTime
           }
         };
 
@@ -292,6 +303,7 @@ export class ApiServer {
     this.app.get('/api/stats', async (req, res) => {
       try {
         const data = await this.storage.load();
+        const enrichedData = await this.enrichDataWithYouTube(data);
         
         // Calculate statistics
         const artistCounts: { [key: string]: number } = {};
@@ -299,7 +311,7 @@ export class ApiServer {
         const showCounts: { [key: string]: number } = {};
         const playCountDistribution: { [key: number]: number } = {};
 
-        data.doublePlays.forEach((dp: DoublePlay) => {
+        enrichedData.doublePlays.forEach((dp: DoublePlay) => {
           // Artist stats
           artistCounts[dp.artist] = (artistCounts[dp.artist] || 0) + 1;
           
@@ -387,6 +399,19 @@ export class ApiServer {
       
       this.sendValidatedResponse(res, errorResponse, ErrorResponseSchema, 404);
     });
+  }
+
+  // Helper method to enrich double play data with YouTube IDs
+  private async enrichDataWithYouTube(data: DoublePlayData): Promise<DoublePlayData> {
+    if (!this.youtubeManager) {
+      return data;
+    }
+
+    const enrichedDoublePlays = this.youtubeManager.enrichWithYouTubeIds(data.doublePlays);
+    return {
+      ...data,
+      doublePlays: enrichedDoublePlays
+    };
   }
 
   // Methods to update scanner status and set scan queue
