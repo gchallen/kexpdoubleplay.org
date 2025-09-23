@@ -27,14 +27,21 @@ export class ScanQueue {
   private stateManager: ScannerStateManager;
   private onScanComplete?: (direction: 'forward' | 'backward' | 'mixed', scanTimeMs: number, requestCount: number) => void;
   private saveData?: () => Promise<void>;
+  private maxLookbackDays: number;
+  private backwardOnlyMode: boolean;
+  private targetStartDate?: moment.Moment;
+  private onBackwardScanComplete?: () => void;
 
-  constructor(api: KEXPApi, detector: DoublePlayDetector, storage: Storage, data: DoublePlayData) {
+  constructor(api: KEXPApi, detector: DoublePlayDetector, storage: Storage, data: DoublePlayData, maxLookbackDays: number = 365, backwardOnlyMode: boolean = false, targetStartDate?: string) {
     this.api = api;
     this.detector = detector;
     this.storage = storage;
     this.data = data;
     this.stateManager = new ScannerStateManager();
     this.progressMonitor = new ProgressMonitor(data, this.stateManager);
+    this.maxLookbackDays = maxLookbackDays;
+    this.backwardOnlyMode = backwardOnlyMode;
+    this.targetStartDate = targetStartDate ? moment(targetStartDate) : undefined;
   }
 
   setOnScanComplete(callback: (direction: 'forward' | 'backward' | 'mixed', scanTimeMs: number, requestCount: number) => void): void {
@@ -45,11 +52,55 @@ export class ScanQueue {
     this.saveData = saveHandler;
   }
 
+  setOnBackwardScanComplete(callback: () => void): void {
+    this.onBackwardScanComplete = callback;
+  }
+
   start(): void {
     this.isRunning = true;
     this.stateManager.setRunning(true);
     this.progressMonitor.start();
-    this.startPeriodicForwardScans();
+
+    // Check if we need an initial forward scan to populate empty data
+    // This happens with --restart when we have a date range but no actual data
+    const hasNoData = this.data.doublePlays.length === 0;
+    const startTime = moment(this.data.startTime);
+    const endTime = moment(this.data.endTime);
+
+    if (hasNoData && startTime.isBefore(endTime)) {
+      // We have a time range but no data - need to scan it
+      const hoursToScan = endTime.diff(startTime, 'hours');
+      logger.info('Initial data population needed - scanning configured time range', {
+        startTime: startTime.toISOString(),
+        endTime: endTime.toISOString(),
+        hours: hoursToScan
+      });
+
+      // For initial population, use larger chunks (up to 24 hours at a time)
+      const maxInitialChunkHours = 24;
+      let currentStart = startTime.clone();
+
+      while (currentStart.isBefore(endTime)) {
+        const chunkEnd = moment.min(
+          currentStart.clone().add(maxInitialChunkHours, 'hours'),
+          endTime
+        );
+
+        this.queue.push({
+          type: 'forward',
+          startTime: currentStart.clone(),
+          endTime: chunkEnd
+        });
+
+        currentStart = chunkEnd;
+      }
+
+      logger.info(`Queued ${this.queue.length} initial scan job(s) for data population`);
+    }
+
+    if (!this.backwardOnlyMode) {
+      this.startPeriodicForwardScans();
+    }
     this.enqueueInitialBackwardScan();
     this.processQueue();
   }
@@ -116,8 +167,8 @@ export class ScanQueue {
 
   private enqueueInitialBackwardScan(): void {
     const startTime = moment(this.data.startTime);
-    // KEXP API only provides data for the last 365 days
-    const stopDate = config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(365, 'days');
+    // Use target start date in backward-only mode, otherwise use configured lookback days
+    const stopDate = this.targetStartDate || (config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(this.maxLookbackDays, 'days'));
     
     logger.debug('Checking for initial backward scan', {
       currentStartTime: startTime.toISOString(),
@@ -125,7 +176,9 @@ export class ScanQueue {
       needsBackwardScan: startTime.isAfter(stopDate)
     });
     
-    if (startTime.isAfter(stopDate)) {
+    // Check if we need to continue scanning (startTime is after stopDate)
+    // Use day-level precision for date comparison to avoid time precision issues
+    if (startTime.isAfter(stopDate, 'day')) {
       const backwardEnd = moment.max(startTime.clone().subtract(1, 'hour'), stopDate);
       
       this.queue.push({
@@ -250,6 +303,28 @@ export class ScanQueue {
     // Set idle when queue is empty
     if (this.isRunning) {
       this.stateManager.setScanIdle();
+
+      // Check if backward-only scan is complete
+      if (this.backwardOnlyMode && this.queue.length === 0) {
+        const startTime = moment(this.data.startTime);
+        const stopDate = this.targetStartDate || moment().subtract(this.maxLookbackDays, 'days');
+
+        // If we've reached or passed the target date, trigger completion
+        if (startTime.isSameOrBefore(stopDate, 'day')) {
+          logger.info('Backward-only scan completed - queue empty and target reached', {
+            currentStartTime: startTime.toISOString(),
+            targetDate: stopDate.toISOString()
+          });
+
+          if (this.onBackwardScanComplete) {
+            setImmediate(() => {
+              if (this.onBackwardScanComplete) {
+                this.onBackwardScanComplete();
+              }
+            });
+          }
+        }
+      }
     }
 
     this.processing = false;
@@ -393,11 +468,30 @@ export class ScanQueue {
 
   private enqueueNextBackwardScan(): void {
     const startTime = moment(this.data.startTime);
-    // KEXP API only provides data for the last 365 days
-    const stopDate = config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(365, 'days');
-    
-    if (startTime.isAfter(stopDate)) {
+    // Use target start date in backward-only mode, otherwise use configured lookback days
+    const stopDate = this.targetStartDate || (config.historicalScanStopDate ? moment(config.historicalScanStopDate) : moment().subtract(this.maxLookbackDays, 'days'));
+
+    logger.debug('Backward scan decision check', {
+      currentStartTime: startTime.toISOString(),
+      stopDate: stopDate.toISOString(),
+      backwardOnlyMode: this.backwardOnlyMode,
+      isAfterStopDate: startTime.isAfter(stopDate, 'day'),
+      targetStartDate: this.targetStartDate?.toISOString()
+    });
+
+    // Check if we need to continue scanning (startTime is after stopDate)
+    // Use day-level precision for date comparison to avoid time precision issues
+    const needsMoreScanning = startTime.isAfter(stopDate, 'day');
+
+    if (needsMoreScanning) {
       const backwardEnd = moment.max(startTime.clone().subtract(config.maxHoursPerRequest, 'hours'), stopDate);
+
+      logger.info('Backward scan will continue', {
+        currentStartTime: startTime.toISOString(),
+        stopDate: stopDate.toISOString(),
+        nextBackwardEnd: backwardEnd.toISOString(),
+        maxLookbackDays: this.maxLookbackDays
+      });
       
       // Only queue if no backward scan already queued
       const hasBackwardJob = this.queue.some(q => q.type === 'backward');
@@ -414,7 +508,13 @@ export class ScanQueue {
         });
       }
     } else {
-      logger.info('Backward scan complete - reached historical scan stop date');
+      logger.info('Backward scan complete - reached configured limit', {
+        currentStartTime: startTime.toISOString(),
+        stopDate: stopDate.toISOString(),
+        maxLookbackDays: this.maxLookbackDays,
+        backwardOnlyMode: this.backwardOnlyMode,
+        reason: startTime.isSameOrBefore(stopDate) ? 'startTime reached stopDate' : 'other'
+      });
       
       // Show message to user when progress bar is enabled
       if (process.argv.includes('--progress')) {
@@ -422,7 +522,22 @@ export class ScanQueue {
         console.log(`\n✅ Historical scanning complete!`);
         console.log(`   Reached KEXP API data limit (${stopDate.format('YYYY-MM-DD')})`);
         console.log(`   Scanned ${daysSinceStopDate} days of historical data`);
-        console.log(`   Continuing with forward scans only...\n`);
+        if (this.backwardOnlyMode) {
+          console.log(`   Backward-only scan complete - exiting...\n`);
+        } else {
+          console.log(`   Continuing with forward scans only...\n`);
+        }
+      }
+
+      // Call completion callback if in backward-only mode
+      if (this.backwardOnlyMode && this.onBackwardScanComplete) {
+        logger.info('Triggering backward scan completion callback');
+        // Use setImmediate to ensure the callback runs after current processing completes
+        setImmediate(() => {
+          if (this.onBackwardScanComplete) {
+            this.onBackwardScanComplete();
+          }
+        });
       }
     }
   }
