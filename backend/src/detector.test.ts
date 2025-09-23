@@ -367,5 +367,79 @@ describe('DoublePlayDetector', () => {
       const classification = (detector as any).calculateClassification(playsWithDurations);
       expect(classification).toBe('legitimate');
     });
+
+    it('should detect World News double play from September 23, 2025 with real KEXP data', async () => {
+      // Real KEXP API data from September 23, 2025 7:26-7:31 AM Pacific
+      const plays: KEXPPlay[] = [
+        {
+          airdate: '2025-09-23T07:26:19-07:00',
+          artist: 'World News',
+          song: 'Everything is Coming Up Roses',
+          album: 'Everything is Coming Up Roses',
+          play_id: 3556644,
+          play_type: 'trackplay'
+        },
+        {
+          airdate: '2025-09-23T07:29:55-07:00',
+          artist: '',
+          song: '',
+          play_id: 3556645,
+          play_type: 'airbreak'
+        },
+        {
+          airdate: '2025-09-23T07:31:05-07:00',
+          artist: 'World News',
+          song: 'Everything is Coming Up Roses',
+          album: 'Everything is Coming Up Roses',
+          play_id: 3556646,
+          play_type: 'trackplay'
+        }
+      ];
+
+      const doublePlays = await detector.detectDoublePlays(plays);
+
+      expect(doublePlays).toHaveLength(1);
+      expect(doublePlays[0].artist).toBe('World News');
+      expect(doublePlays[0].title).toBe('Everything is Coming Up Roses');
+      expect(doublePlays[0].plays).toHaveLength(2);
+      expect(doublePlays[0].plays[0].play_id).toBe(3556644);
+      expect(doublePlays[0].plays[1].play_id).toBe(3556646);
+    });
+
+    it('should detect World News double play with missing album info', async () => {
+      // Test case: KEXP API returns null/undefined album info but should still detect double play
+      const plays: KEXPPlay[] = [
+        {
+          airdate: '2025-09-23T07:26:19-07:00',
+          artist: 'World News',
+          song: 'Everything is Coming Up Roses',
+          album: undefined, // Missing album info
+          play_id: 3556644,
+          play_type: 'trackplay'
+        },
+        {
+          airdate: '2025-09-23T07:29:55-07:00',
+          artist: '',
+          song: '',
+          play_id: 3556645,
+          play_type: 'airbreak'
+        },
+        {
+          airdate: '2025-09-23T07:31:05-07:00',
+          artist: 'World News',
+          song: 'Everything is Coming Up Roses',
+          album: null, // Missing album info (null)
+          play_id: 3556646,
+          play_type: 'trackplay'
+        }
+      ];
+
+      const doublePlays = await detector.detectDoublePlays(plays);
+
+      expect(doublePlays).toHaveLength(1);
+      expect(doublePlays[0].artist).toBe('World News');
+      expect(doublePlays[0].title).toBe('Everything is Coming Up Roses');
+      expect(doublePlays[0].plays).toHaveLength(2);
+    });
   });
 });
