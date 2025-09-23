@@ -65,15 +65,20 @@ export class DoublePlayDetector {
       
       while (j < finalSortedPlays.length) {
         const nextPlay = finalSortedPlays[j];
-        
-        if (nextPlay.play_type === 'trackplay' && 
-            this.isSameSong(currentPlay, nextPlay)) {
-          sameSongPlays.push(nextPlay);
-          j++;
-        } else if (nextPlay.play_type !== 'trackplay') {
-          j++;
+
+        if (nextPlay.play_type === 'trackplay') {
+          if (this.isSameSong(currentPlay, nextPlay)) {
+            // Found another play of the same song
+            sameSongPlays.push(nextPlay);
+            j++;
+          } else {
+            // Different song - we can stop looking for this group
+            // But first check if we found enough plays to constitute a double play
+            break;
+          }
         } else {
-          break;
+          // Non-trackplay (airbreak, etc.) - skip and continue looking
+          j++;
         }
       }
       
@@ -174,9 +179,27 @@ export class DoublePlayDetector {
   }
   
   private isSameSong(play1: KEXPPlay, play2: KEXPPlay): boolean {
-    return play1.artist?.toLowerCase() === play2.artist?.toLowerCase() &&
-           play1.song?.toLowerCase() === play2.song?.toLowerCase() &&
-           play1.album?.toLowerCase() === play2.album?.toLowerCase();
+    // Artist and song must match
+    const artistMatch = play1.artist?.toLowerCase() === play2.artist?.toLowerCase();
+    const songMatch = play1.song?.toLowerCase() === play2.song?.toLowerCase();
+
+    if (!artistMatch || !songMatch) {
+      return false;
+    }
+
+    // Album comparison: only require match if both plays have album info
+    // This handles cases where new tracks don't have album info yet, or album data is inconsistent
+    const album1 = play1.album?.toLowerCase();
+    const album2 = play2.album?.toLowerCase();
+
+    // If both have album info, they must match
+    if (album1 && album2) {
+      return album1 === album2;
+    }
+
+    // If one or both are missing album info, consider it a match based on artist/song alone
+    // This is important for new releases, singles, or inconsistent KEXP API data
+    return true;
   }
   
   mergeDoublePlays(existing: DoublePlay[], newPlays: DoublePlay[]): DoublePlay[] {
