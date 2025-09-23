@@ -16,6 +16,7 @@ import { DoublePlayData, ScanStats } from '@kexp-doubleplay/types';
 import { ApiServer } from './api-server';
 import { ScanQueue } from './scan-queue';
 import logger from './logger';
+import { CLIOptions } from './index';
 
 export class Scanner {
   private api: KEXPApi;
@@ -29,15 +30,26 @@ export class Scanner {
   private scanQueue?: ScanQueue;
   private backupCheckTask?: cron.ScheduledTask;
   private youtubeUpdateTask?: cron.ScheduledTask;
+  private options: CLIOptions;
 
-  constructor() {
+  constructor(options?: CLIOptions) {
+    this.options = options || {
+      restart: false,
+      startDate: moment().subtract(365, 'days').format('YYYY-MM-DD'),
+      backwardScan: false,
+      forceLocal: false,
+      forceBackup: false,
+      progress: false,
+      debug: false,
+      dryRun: false
+    };
     this.api = new KEXPApi();
     this.detector = new DoublePlayDetector(this.api);
     this.storage = new Storage(config.dataFilePath);
     this.backupManager = new BackupManager();
     this.youtubeManager = new YouTubeManager();
     this.data = {
-      startTime: moment().subtract(7, 'days').toISOString(),
+      startTime: moment(this.options.startDate).toISOString(),
       endTime: moment().toISOString(),
       doublePlays: [],
       counts: {
@@ -56,10 +68,16 @@ export class Scanner {
   }
 
   async initialize(): Promise<void> {
-    const hasRestartFlag = process.argv.includes('--restart');
-    const forceLocalFlag = process.argv.includes('--force-local');
-    const forceBackupFlag = process.argv.includes('--force-backup');
-    
+    const hasRestartFlag = this.options.restart;
+    const forceLocalFlag = this.options.forceLocal;
+    const forceBackupFlag = this.options.forceBackup;
+    const startDate = moment(this.options.startDate);
+
+    logger.info(`Backward scan limit: ${this.options.startDate}`, {
+      startDate: this.options.startDate,
+      backwardScanOnly: this.options.backwardScan
+    });
+
     // Initialize backup manager first
     await this.backupManager.initialize();
     
@@ -137,18 +155,44 @@ export class Scanner {
       logger.info('Using backup data - only available source');
     } else {
       // No data available, start fresh
-      this.data = {
-        startTime: moment().subtract(7, 'days').toISOString(),
-        endTime: moment().toISOString(),
-        doublePlays: [],
-        counts: {
-          legitimate: 0,
-          partial: 0,
-          mistake: 0
-        }
-      };
-      dataSource = 'fresh start (no existing data)';
-      logger.info('Starting with fresh data - no local file or backup found');
+      const now = moment();
+      if (this.options.backwardScan) {
+        // For backward-only mode, set startTime to one day after the target date
+        // This ensures the backward scan will trigger and go to the target date
+        const targetStart = moment(this.options.startDate);
+        this.data = {
+          startTime: targetStart.clone().add(1, 'day').toISOString(),
+          endTime: now.toISOString(),
+          doublePlays: [],
+          counts: {
+            legitimate: 0,
+            partial: 0,
+            mistake: 0
+          }
+        };
+        dataSource = 'fresh start (backward-only mode)';
+        logger.info('Starting fresh data for backward-only scan', {
+          targetStartDate: this.options.startDate,
+          dataStartTime: this.data.startTime
+        });
+      } else {
+        // Normal mode: start from now and let backward scan handle the lookback period
+        this.data = {
+          startTime: now.toISOString(),
+          endTime: now.toISOString(),
+          doublePlays: [],
+          counts: {
+            legitimate: 0,
+            partial: 0,
+            mistake: 0
+          }
+        };
+        dataSource = 'fresh start (no existing data)';
+        const maxLookbackDays = Math.ceil(now.diff(startDate, 'days', true));
+        logger.info('Starting with fresh data - backward scan will cover lookback period', {
+          maxLookbackDays: maxLookbackDays
+        });
+      }
     }
     
     console.log(chalk.cyan('🎵 KEXP Double Play Scanner Initialized'));
@@ -260,12 +304,30 @@ export class Scanner {
     try {
       this.apiServer?.updateScannerStatus('running');
       
+      // Calculate max lookback days from startDate
+      const startDateMoment = moment(this.options.startDate);
+      const now = moment();
+      const maxLookbackDays = Math.ceil(now.diff(startDateMoment, 'days', true));
+
       // Initialize and start the scan queue
-      this.scanQueue = new ScanQueue(this.api, this.detector, this.storage, this.data);
+      this.scanQueue = new ScanQueue(this.api, this.detector, this.storage, this.data, maxLookbackDays, this.options.backwardScan, this.options.backwardScan ? this.options.startDate : undefined);
       this.scanQueue.setOnScanComplete((direction, scanTimeMs, requestCount) => {
         this.updateScanStats(direction, scanTimeMs, requestCount);
       });
       this.scanQueue.setSaveDataHandler(() => this.saveDataWithBackupCheck());
+
+      // Set up completion handler for backward-only mode
+      if (this.options.backwardScan) {
+        this.scanQueue.setOnBackwardScanComplete(() => {
+          console.log(chalk.green('✅ Backward scan complete - exiting as requested'));
+          this.stop().then(() => {
+            process.exit(0);
+          }).catch((error) => {
+            logger.error('Error during shutdown after backward scan completion', { error });
+            process.exit(1);
+          });
+        });
+      }
       
       // Pass scan queue to API server for health monitoring
       this.apiServer?.setScanQueue(this.scanQueue);
@@ -431,7 +493,6 @@ export class Scanner {
     endTime: moment.Moment, 
     direction: 'forward' | 'backward'
   ): Promise<void> {
-    console.log(chalk.magenta(`🔍 DEBUG: scanRange called - ${direction} from ${startTime.format('MMM DD HH:mm')} to ${endTime.format('MMM DD HH:mm')}`));
     
     const scanStartTime = Date.now();
     const requestCountBefore = this.api.getTotalRequests();
