@@ -1,6 +1,6 @@
 {
   "name": "kexp-doubleplay-backend",
-  "version": "2025.8.1",
+  "version": "2025.9.0",
   "description": "KEXP Double Play Scanner Backend API",
   "main": "dist/index.js",
   "type": "commonjs",
@@ -18,9 +18,9 @@
     "k8s:status": "kubectl get deployment api-kexpdoubleplays-org-deployment -n kexpdoubleplays",
     "k8s:logs": "kubectl logs -f deployment/api-kexpdoubleplays-org-deployment -n kexpdoubleplays",
     "compile": "mkdir -p dist && bun build --compile --target=bun-linux-arm64-musl --outfile=dist/kexp-doubleplay-backend-arm64 src/index.ts && bun build --compile --target=bun-linux-x64-musl --outfile=dist/kexp-doubleplay-backend-amd64 src/index.ts",
-    "docker:build": "bun run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org .",
+    "docker:build": "bun run compile && VERSION=$(node -p \"require('./package.json').version\") && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org:latest -t geoffreychallen/api-kexpdoubleplays-org:$VERSION .",
     "docker:run": "bun run docker:build && docker run --rm -it --env-file .env -p ${API_PORT:-3000}:3000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs -v $(pwd)/backups:/app/backups geoffreychallen/api-kexpdoubleplays-org",
-    "docker:push": "bun run compile && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org --push ."
+    "docker:push": "bun run compile && VERSION=$(node -p \"require('./package.json').version\") && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org:latest -t geoffreychallen/api-kexpdoubleplays-org:$VERSION --push ."
   },
   "keywords": ["kexp", "radio", "double-play", "scanner", "api"],
   "author": "",
