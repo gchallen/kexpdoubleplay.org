@@ -56,10 +56,16 @@ export class BackupManager {
   }
 
   async initialize(): Promise<void> {
+    logger.info('Backup manager initializing', {
+      backupIntervalHours: config.backupIntervalHours,
+      githubEnabled: this.isGitHubEnabled,
+      localEnabled: this.isLocalEnabled
+    });
+
     if (this.isGitHubEnabled) {
       await this.testGitHubConnection();
     }
-    
+
     if (this.isLocalEnabled && this.localBackupPath) {
       this.ensureLocalBackupDirectory();
       logger.info('Local backup initialized', { path: this.localBackupPath });
@@ -233,6 +239,12 @@ export class BackupManager {
   }
 
   async checkAndBackup(): Promise<void> {
+    logger.info('Backup check starting', {
+      githubEnabled: this.isGitHubEnabled,
+      localEnabled: this.isLocalEnabled,
+      lastDateRange: this.lastDateRange
+    });
+
     try {
       // Read current data
       const dataPath = config.dataFilePath;
@@ -255,7 +267,7 @@ export class BackupManager {
           localEnabled: this.isLocalEnabled
         });
       } else {
-        logger.debug('Backup not needed - date range unchanged');
+        logger.info('Backup not needed - date range unchanged');
       }
     } catch (error) {
       logger.error('Backup check failed', {
@@ -315,16 +327,21 @@ export class BackupManager {
     const lastStart = moment(this.lastDateRange.start);
     const lastEnd = moment(this.lastDateRange.end);
 
-    // Check if range expanded by at least one day in either direction
-    const startExpanded = currentStart.isBefore(lastStart, 'day');
-    const endExpanded = currentEnd.isAfter(lastEnd, 'day');
+    // Check if range expanded by at least backupIntervalHours in either direction
+    const intervalHours = config.backupIntervalHours;
+    const startExpandedHours = lastStart.diff(currentStart, 'hours', true);
+    const endExpandedHours = currentEnd.diff(lastEnd, 'hours', true);
+
+    const startExpanded = startExpandedHours >= intervalHours;
+    const endExpanded = endExpandedHours >= intervalHours;
 
     if (startExpanded || endExpanded) {
       logger.info('Date range expanded, triggering backup', {
         previousRange: `${this.lastDateRange.start} to ${this.lastDateRange.end}`,
         currentRange: `${currentRange.start} to ${currentRange.end}`,
-        startExpanded,
-        endExpanded
+        startExpandedHours: startExpandedHours.toFixed(2),
+        endExpandedHours: endExpandedHours.toFixed(2),
+        intervalHours
       });
       return true;
     }

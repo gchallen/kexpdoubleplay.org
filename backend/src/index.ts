@@ -23,6 +23,9 @@ export interface CLIOptions {
 import { version } from '../package.json';
 import moment from 'moment';
 
+// Build timestamp embedded at compile time
+const BUILD_TIME = new Date().toISOString();
+
 // Create CLI interface
 const program = new Command();
 
@@ -128,6 +131,8 @@ async function main() {
   }
 
   logger.info('KEXP Double Play Scanner starting', {
+    version,
+    buildTime: BUILD_TIME,
     nodeVersion: process.version,
     platform: process.platform,
     architecture: process.arch,

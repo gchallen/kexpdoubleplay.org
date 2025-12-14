@@ -232,7 +232,8 @@ export const ConfigSchema = z.object({
   rateLimitDelay: z.number(),
   scanIntervalMinutes: z.number(),
   maxHoursPerRequest: z.number(),
-  historicalScanStopDate: z.string().optional()
+  historicalScanStopDate: z.string().optional(),
+  backupIntervalHours: z.number()
 });
 
 // TypeScript type exports

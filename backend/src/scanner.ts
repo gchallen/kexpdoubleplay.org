@@ -27,7 +27,6 @@ export class Scanner {
   private isRunning = false;
   private apiServer?: ApiServer;
   private scanQueue?: ScanQueue;
-  private backupCheckTask?: cron.ScheduledTask;
   private youtubeUpdateTask?: cron.ScheduledTask;
   private options: CLIOptions;
 
@@ -230,21 +229,6 @@ export class Scanner {
     console.log(chalk.dim(`   API server: http://localhost:${apiPort}\n`));
     logger.debug('API server started', { port: apiPort });
     
-    // Schedule periodic backup checks (every 10 minutes)
-    this.backupCheckTask = cron.schedule('*/10 * * * *', async () => {
-      try {
-        await this.backupManager.checkAndBackup();
-      } catch (error) {
-        logger.error('Backup check failed', {
-          error: error instanceof Error ? error.message : error
-        });
-      }
-    });
-    
-    // Start the backup check task
-    this.backupCheckTask.start();
-    logger.debug('Backup check scheduled every 10 minutes');
-
     // Schedule periodic YouTube data updates (every 5 minutes)
     this.youtubeUpdateTask = cron.schedule('*/5 * * * *', async () => {
       try {
@@ -350,12 +334,6 @@ export class Scanner {
     this.isRunning = false;
     console.log(chalk.yellow('\n📴 Scanner stopping...'));
     
-    // Stop backup check task
-    if (this.backupCheckTask) {
-      this.backupCheckTask.stop();
-      logger.debug('Stopped backup check task');
-    }
-
     // Stop YouTube update task
     if (this.youtubeUpdateTask) {
       this.youtubeUpdateTask.stop();
