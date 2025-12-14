@@ -1,3 +1,22 @@
+7_year_bitch__kiss_my_ass_goodbye__viva_zapata:
+  album: ¡Viva Zapata!
+  artist: 7 Year Bitch
+  duration: 0
+  durations:
+    - 0
+  search_url: https://www.youtube.com/results?search_query=7%20Year%20Bitch%20Kiss%20My%20Ass%20Goodbye
+  title: Kiss My Ass Goodbye
+  youtube_id: qsvTCGbyINE
+anna_von_hausswolff__stardust__stardust_the_whole_woman:
+  album: Stardust / The Whole Woman
+  artist: Anna von Hausswolff
+  duration: 397
+  durations:
+    - 397
+    - 385
+  search_url: https://www.youtube.com/results?search_query=Anna%20von%20Hausswolff%20Stardust
+  title: Stardust
+  youtube_id: HpMHH_W8G9s
 belafonte_sensacional__chris_farley__no_album:
   album: null
   artist: Belafonte Sensacional
@@ -8,6 +27,15 @@ belafonte_sensacional__chris_farley__no_album:
   search_url: https://www.youtube.com/results?search_query=Belafonte%20Sensacional%20Chris%20Farley
   title: Chris Farley
   youtube_id: 5RaTElVsFAw
+better_joy__steamroller__steamroller:
+  album: steamroller
+  artist: Better Joy
+  duration: 10
+  durations:
+    - 10
+  search_url: https://www.youtube.com/results?search_query=Better%20Joy%20steamroller
+  title: steamroller
+  youtube_id: qh0U_7Yi8To
 brownout__dont_believe_the_hype__fear_of_a_brown_planet:
   album: Fear of a Brown Planet
   artist: Brownout
@@ -68,6 +96,25 @@ fashion_club__one_day__a_love_you_cannot_shake:
   search_url: https://www.youtube.com/results?search_query=Fashion%20Club%20One%20Day
   title: One Day
   youtube_id: NASJ91KOC1g
+found_space__nostalgia__nostalgia:
+  album: nostalgia
+  artist: Found Space
+  duration: 67
+  durations:
+    - 67
+  search_url: https://www.youtube.com/results?search_query=Found%20Space%20nostalgia
+  title: nostalgia
+  youtube_id: W52hjWOXtiI
+goat_mc_yallah__nimerudi__nimerudi:
+  album: Nimerudi
+  artist: Goat & MC Yallah
+  duration: 225
+  durations:
+    - 225
+    - 228
+  search_url: https://www.youtube.com/results?search_query=Goat%20%26%20MC%20Yallah%20Nimerudi
+  title: Nimerudi
+  youtube_id: msjLFlNBlR0
 id__id__no_album:
   album: null
   artist: ID
@@ -75,9 +122,19 @@ id__id__no_album:
   durations:
     - 237
     - 122
+    - 237
   search_url: https://www.youtube.com/results?search_query=ID%20ID
   title: ID
   youtube_id: ""
+idles_nick_zinner__rabbit_run_nick_zinner_remix__caught_stealing_remixes:
+  album: Caught Stealing Remixes
+  artist: IDLES & Nick Zinner
+  duration: 15
+  durations:
+    - 15
+  search_url: https://www.youtube.com/results?search_query=IDLES%20%26%20Nick%20Zinner%20Rabbit%20Run%20(Nick%20Zinner%20remix)
+  title: Rabbit Run (Nick Zinner remix)
+  youtube_id: Mkjm0Mxiz2E
 jay_som_feat_jim_adkins__float__belong:
   album: Belong
   artist: Jay Som feat. Jim Adkins
@@ -88,6 +145,16 @@ jay_som_feat_jim_adkins__float__belong:
   search_url: https://www.youtube.com/results?search_query=Jay%20Som%20feat.%20Jim%20Adkins%20Float
   title: Float
   youtube_id: L8zILRiE5wk
+jeff_tweedy__bad_day_lately__love_is_the_king:
+  album: Love Is the King
+  artist: Jeff Tweedy
+  duration: 7
+  durations:
+    - 7
+    - 185
+  search_url: https://www.youtube.com/results?search_query=Jeff%20Tweedy%20Bad%20Day%20Lately
+  title: Bad Day Lately
+  youtube_id: -XZ4GA4WTa0
 michael_hurley__driving_wheel__have_moicy:
   album: Have Moicy!
   artist: Michael Hurley
@@ -98,6 +165,16 @@ michael_hurley__driving_wheel__have_moicy:
   search_url: https://www.youtube.com/results?search_query=Michael%20Hurley%20Driving%20Wheel
   title: Driving Wheel
   youtube_id: _oOPH_RMCgA
+miki__chec_et_mat__no_album:
+  album: null
+  artist: Miki
+  duration: 158
+  durations:
+    - 158
+    - 139
+  search_url: https://www.youtube.com/results?search_query=Miki%20%C3%89chec%20et%20mat
+  title: Échec et mat
+  youtube_id: R9aSObp_FYc
 miki_berenyi_trio__vertigo__tripla:
   album: Tripla
   artist: Miki Berenyi Trio
@@ -118,6 +195,16 @@ nation_of_language__inept_apollo__inept_apollo:
   search_url: https://www.youtube.com/results?search_query=Nation%20of%20Language%20Inept%20Apollo
   title: Inept Apollo
   youtube_id: xjCgSSepzrA
+neil_young__dont_let_it_bring_you_down__after_the_gold_rush:
+  album: After the Gold Rush
+  artist: Neil Young
+  duration: 142
+  durations:
+    - 142
+    - 60
+  search_url: https://www.youtube.com/results?search_query=Neil%20Young%20Don%E2%80%99t%20Let%20It%20Bring%20You%20Down
+  title: Don’t Let It Bring You Down
+  youtube_id: eVy1h2FcRiM
 new_order__age_of_consent__power_corruption_lies:
   album: Power, Corruption & Lies
   artist: New Order
@@ -178,6 +265,25 @@ shady_baby__held_in__held_in:
   search_url: https://www.youtube.com/results?search_query=Shady%20Baby%20Held%20In
   title: Held In
   youtube_id: mhDWorCVMZo
+shoko_igarashi__en__no_album:
+  album: null
+  artist: Shoko Igarashi
+  duration: 67
+  durations:
+    - 67
+    - 277
+  search_url: https://www.youtube.com/results?search_query=Shoko%20Igarashi%20EN
+  title: EN
+  youtube_id: 9uZS2W6j8qE
+sly_the_family_stone__family_affair__theres_a_riot_goin_on:
+  album: There's a Riot Goin' On
+  artist: Sly & the Family Stone
+  duration: 11
+  durations:
+    - 11
+  search_url: https://www.youtube.com/results?search_query=Sly%20%26%20the%20Family%20Stone%20Family%20Affair
+  title: Family Affair
+  youtube_id: xag5RKD0VHk
 sochi__tlajomulco__no_album:
   album: null
   artist: sochi
@@ -198,6 +304,16 @@ stubbleman__an_everlasting_universe_of_things__14643_the_ventoux_trilogy:
   search_url: https://www.youtube.com/results?search_query=Stubbleman%20An%20Everlasting%20Universe%20of%20Things
   title: An Everlasting Universe of Things
   youtube_id: AvoDZE7Got0
+suzzallo__river__the_quiet_year:
+  album: The Quiet Year
+  artist: Suzzallo
+  duration: 210
+  durations:
+    - 210
+    - 205
+  search_url: https://www.youtube.com/results?search_query=Suzzallo%20River
+  title: River
+  youtube_id: LAnI4tU0b6I
 tears_for_fears__everybody_wants_to_rule_the_world__songs_from_the_big_chair:
   album: Songs From the Big Chair
   artist: Tears for Fears
@@ -218,6 +334,16 @@ the_postal_service__such_great_heights__give_up:
   search_url: https://www.youtube.com/results?search_query=The%20Postal%20Service%20Such%20Great%20Heights
   title: Such Great Heights
   youtube_id: 0wrsZog8qXg
+the_undisputed_truth__ufos__no_album:
+  album: null
+  artist: The Undisputed Truth
+  duration: 45
+  durations:
+    - 45
+    - 165
+  search_url: https://www.youtube.com/results?search_query=The%20Undisputed%20Truth%20UFO's
+  title: UFO's
+  youtube_id: AF_jd4_ZXNc
 the_waitresses__christmas_wrapping__a_christmas_record:
   album: A Christmas Record
   artist: The Waitresses
@@ -248,6 +374,15 @@ when_in_rome__the_promise__when_in_rome:
   search_url: https://www.youtube.com/results?search_query=When%20in%20Rome%20The%20Promise
   title: The Promise
   youtube_id: 5HI_xFQWiYU
+wimps__vampire__live_on_kexp:
+  album: Live on KEXP
+  artist: Wimps
+  duration: 101
+  durations:
+    - 101
+  search_url: https://www.youtube.com/results?search_query=Wimps%20Vampire
+  title: Vampire
+  youtube_id: k38Vm4EwYlM
 witch_post__dreaming__beast:
   album: Beast
   artist: Witch Post
@@ -278,6 +413,16 @@ world_news__everything_is_coming_up_roses__everything_is_coming_up_roses:
   search_url: https://www.youtube.com/results?search_query=World%20News%20Everything%20is%20Coming%20Up%20Roses
   title: Everything is Coming Up Roses
   youtube_id: VMURetSXap4
+worthitpurchase__something_new__something_new:
+  album: Something New
+  artist: Worthitpurchase
+  duration: 258
+  durations:
+    - 258
+    - 251
+  search_url: https://www.youtube.com/results?search_query=Worthitpurchase%20Something%20New
+  title: Something New
+  youtube_id: dANV3Ti6ts8
 wunderhorse__the_rope__the_rope:
   album: The Rope
   artist: Wunderhorse
@@ -288,3 +433,13 @@ wunderhorse__the_rope__the_rope:
   search_url: https://www.youtube.com/results?search_query=Wunderhorse%20The%20Rope
   title: The Rope
   youtube_id: 62nPtINPw2A
+zookraught__laughingstock__live_on_kexp:
+  album: Live on KEXP
+  artist: Zookraught
+  duration: 0
+  durations:
+    - 0
+    - 0
+  search_url: https://www.youtube.com/results?search_query=Zookraught%20Laughingstock
+  title: Laughingstock
+  youtube_id: guHQCzkry5Q
