@@ -4,6 +4,7 @@ import moment from 'moment';
 import fetch from 'node-fetch';
 import { DoublePlayData } from '@kexp-doubleplay/types';
 import logger from './logger';
+import { config } from './config';
 
 interface GitHubFileResponse {
   sha: string;
@@ -234,9 +235,9 @@ export class BackupManager {
   async checkAndBackup(): Promise<void> {
     try {
       // Read current data
-      const dataPath = './double-plays.json';
+      const dataPath = config.dataFilePath;
       if (!fs.existsSync(dataPath)) {
-        logger.debug('No data file to backup');
+        logger.warn('No data file to backup', { dataPath });
         return;
       }
 
@@ -247,6 +248,12 @@ export class BackupManager {
       if (this.shouldBackup(currentDateRange)) {
         await this.createBackups(data);
         this.lastDateRange = currentDateRange;
+        logger.info('Backup sync completed successfully', {
+          doublePlaysCount: data.doublePlays.length,
+          dateRange: `${data.startTime} to ${data.endTime}`,
+          githubEnabled: this.isGitHubEnabled,
+          localEnabled: this.isLocalEnabled
+        });
       } else {
         logger.debug('Backup not needed - date range unchanged');
       }
@@ -270,9 +277,9 @@ export class BackupManager {
     try {
       // If data is not provided, read from file
       if (!data) {
-        const dataPath = './double-plays.json';
+        const dataPath = config.dataFilePath;
         if (!fs.existsSync(dataPath)) {
-          logger.debug('No data file to backup during shutdown');
+          logger.warn('No data file to backup during shutdown', { dataPath });
           return;
         }
         data = JSON.parse(fs.readFileSync(dataPath, 'utf8')) as DoublePlayData;
