@@ -73,6 +73,7 @@ dj_riz__live_from_brooklyn__12_inch_single:
   durations:
     - 187
     - 930
+  ignored: true
   search_url: https://www.youtube.com/results?search_query=DJ%20Riz%20Live%20From%20Brooklyn
   title: Live From Brooklyn
   youtube_id: ""
@@ -123,6 +124,7 @@ id__id__no_album:
     - 237
     - 122
     - 237
+  ignored: true
   search_url: https://www.youtube.com/results?search_query=ID%20ID
   title: ID
   youtube_id: ""

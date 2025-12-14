@@ -30,6 +30,7 @@ interface YouTubeEntry {
   search_url?: string;
   duration?: number; // Track duration in seconds (backward compatibility)
   durations?: number[]; // All play durations for this track
+  ignored?: boolean; // Mark track as permanently ignored (no YouTube audio available)
 }
 
 interface YouTubeData {
@@ -413,12 +414,21 @@ async function interactiveYouTubeSearch(tracksNeedingUrls: YouTubeEntry[], youtu
       console.log('   📋 Options:');
       console.log('     1. Type "c" or "current" to use the current page URL (after clicking a video)');
       console.log('     2. Paste a YouTube URL manually');
-      console.log('     3. Press Enter to skip');
-      
+      console.log('     3. Type "i" or "ignore" to permanently ignore this track (no YouTube available)');
+      console.log('     4. Press Enter to skip');
+
       const userInput = await promptUser('   ✏️  Your choice: ');
       
       let urlToProcess = '';
-      
+
+      // Handle ignore option
+      if (userInput.trim().toLowerCase() === 'i' || userInput.trim().toLowerCase() === 'ignore') {
+        youtubeData[trackKey].ignored = true;
+        await saveYouTubeDataToFile(youtubeData);
+        console.log('   🚫 Track marked as permanently ignored and file updated!\n');
+        continue;
+      }
+
       if (userInput.trim().toLowerCase() === 'c' || userInput.trim().toLowerCase() === 'current') {
         // Get current URL from the browser page
         try {
@@ -464,7 +474,7 @@ async function interactiveYouTubeSearch(tracksNeedingUrls: YouTubeEntry[], youtu
 /**
  * Main function
  */
-async function main(): void {
+async function main(): Promise<void> {
   try {
     // Check for interactive mode flag
     const isInteractiveMode = process.argv.includes('--interactive') || process.argv.includes('-i');
@@ -525,8 +535,8 @@ async function main(): void {
           entry.duration = durations[0];
         }
         
-        // Check if this track needs a YouTube ID
-        if (!entry.youtube_id || entry.youtube_id.trim() === '') {
+        // Check if this track needs a YouTube ID (skip ignored tracks)
+        if (!entry.ignored && (!entry.youtube_id || entry.youtube_id.trim() === '')) {
           tracksNeedingUrls.push(entry);
         }
       }
@@ -561,6 +571,23 @@ async function main(): void {
     }
     
     console.log(`✨ Found ${newEntries.length} new tracks that need YouTube URLs`);
+
+    // Always show summary of tracks needing URLs
+    const tracksWithoutUrls = Object.values(youtubeData)
+      .filter(entry => !entry.ignored && (!entry.youtube_id || entry.youtube_id.trim() === ''));
+    const ignoredCount = Object.values(youtubeData).filter(e => e.ignored).length;
+
+    if (tracksWithoutUrls.length > 0) {
+      console.log(`\n📋 Tracks still needing YouTube URLs (${tracksWithoutUrls.length}):`);
+      tracksWithoutUrls.forEach((entry, index) => {
+        const albumText = entry.album ? ` (${entry.album})` : ' (no album)';
+        console.log(`   ${index + 1}. ${entry.artist} - "${entry.title}"${albumText}`);
+      });
+      console.log(`\n💡 Run with --interactive or -i flag to search for these`);
+    }
+    if (ignoredCount > 0) {
+      console.log(`🚫 ${ignoredCount} tracks are permanently ignored`);
+    }
     
     if (isInteractiveMode && tracksNeedingUrls.length > 0) {
       console.log(`🎬 Found ${tracksNeedingUrls.length} tracks that need YouTube URLs in interactive mode`);
@@ -585,9 +612,11 @@ async function main(): void {
         }
       }
       
+      const ignoredCount = Object.values(youtubeData).filter(e => e.ignored).length;
       console.log(`\n📊 Results:`);
       console.log(`   🆕 New tracks added: ${newEntries.length}`);
       console.log(`   🔗 YouTube URLs found: ${urlsUpdated}`);
+      console.log(`   🚫 Tracks ignored (total): ${ignoredCount}`);
       console.log(`   ⏭️  Tracks skipped: ${tracksNeedingUrls.length - urlsUpdated}`);
       
       // Save and upload updated data
@@ -623,16 +652,20 @@ async function main(): void {
       console.log(`   3. Use the search_url links to find videos on YouTube`);
     } else {
       console.log('✅ All tracks already have entries in the YouTube file');
-      
+
       if (isInteractiveMode) {
         const tracksWithoutUrls = Object.values(youtubeData)
-          .filter(entry => !entry.youtube_id || entry.youtube_id.trim() === '').length;
+          .filter(entry => !entry.ignored && (!entry.youtube_id || entry.youtube_id.trim() === '')).length;
+        const ignoredCount = Object.values(youtubeData).filter(e => e.ignored).length;
         
         if (tracksWithoutUrls > 0) {
           console.log(`💡 Note: ${tracksWithoutUrls} tracks still need YouTube URLs`);
           console.log('   Run with --interactive to search for them');
         } else {
           console.log('🎉 All tracks have YouTube URLs!');
+        }
+        if (ignoredCount > 0) {
+          console.log(`🚫 ${ignoredCount} tracks are permanently ignored`);
         }
       }
       
@@ -646,7 +679,8 @@ async function main(): void {
     }
     
     console.log('\n🏁 Script completed successfully!');
-    
+    process.exit(0);
+
   } catch (error) {
     console.error('\n💥 Script failed:', error);
     process.exit(1);
@@ -655,5 +689,8 @@ async function main(): void {
 
 // Run the script
 if (import.meta.main) {
-  main();
+  main().catch((error) => {
+    console.error('\n💥 Unhandled error:', error);
+    process.exit(1);
+  });
 }
