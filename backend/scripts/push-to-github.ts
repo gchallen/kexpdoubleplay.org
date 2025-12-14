@@ -1,10 +1,10 @@
 #!/usr/bin/env bun
 
 import fs from 'fs';
-import { DoublePlayData } from './src/types';
-import { BackupManager } from './src/backup-manager';
-import { Storage } from './src/storage';
-import logger from './src/logger';
+import { DoublePlayData } from '@kexp-doubleplay/types';
+import { BackupManager } from '../src/backup-manager';
+import { Storage } from '../src/storage';
+import logger from '../src/logger';
 
 interface ValidationResult {
   isValid: boolean;

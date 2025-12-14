@@ -42,7 +42,7 @@ This is a **multi-workspace project** consisting of a backend API service and a 
 
 ### Package Management
 - **Always use `bun install`, `bun add`, `bun dev`, `bun test`** (never npm/yarn)
-- **Pin all dependencies**: Use exact versions without ^ or ~ for reproducible builds
+- **Pin all dependencies to exact versions**: Never use `^` or `~` version ranges in any package.json (root, types, backend, or frontend). This ensures reproducible builds across all environments.
 - Dependencies managed via bun.lockb files in each workspace
 - **Root workspace**: `bun install` manages all workspaces
 - **Individual workspaces**: `cd backend && bun install` or `cd frontend && bun install`
