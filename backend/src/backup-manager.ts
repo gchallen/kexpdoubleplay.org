@@ -21,6 +21,7 @@ export class BackupManager {
   private githubFilePath: string;
   private localBackupPath: string | null = null;
   private lastDateRange: { start: string; end: string } | null = null;
+  private isBackupInProgress = false;
 
   constructor() {
     // GitHub backup configuration
@@ -384,47 +385,54 @@ export class BackupManager {
       );
     }
 
-    // Create GitHub backup if enabled (runs in parallel)
+    // Create GitHub backup if enabled (serialized - skip if already in progress)
     if (this.isGitHubEnabled) {
-      logger.info('Starting GitHub backup upload', {
-        repo: `${this.githubOwner}/${this.githubRepo}`,
-        filePath: this.githubFilePath
-      });
-      
-      backupPromises.push(
-        (async () => {
-          try {
-            const startTime = Date.now();
-            
-            // Add timeout protection (10 seconds max for GitHub upload)
-            const timeoutPromise = new Promise<never>((_, reject) => {
-              setTimeout(() => reject(new Error('GitHub upload timeout (10s)')), 10000);
-            });
-            
-            await Promise.race([
-              this.uploadToGitHub(data, fileContent),
-              timeoutPromise
-            ]);
-            
-            const duration = Date.now() - startTime;
-            
-            logger.info('GitHub backup completed', {
-              duration: `${duration}ms`,
-              repo: `${this.githubOwner}/${this.githubRepo}`
-            });
-            
-            return { method: 'github', success: true };
-          } catch (error) {
-            logger.error('Failed to create GitHub backup', {
-              error: error instanceof Error ? error.message : error,
-              note: error instanceof Error && error.message.includes('timeout') 
-                ? 'Consider increasing timeout or disabling GitHub backup for shutdown' 
-                : undefined
-            });
-            return { method: 'github', success: false };
-          }
-        })()
-      );
+      if (this.isBackupInProgress) {
+        logger.debug('Skipping GitHub backup - another upload is already in progress');
+      } else {
+        logger.info('Starting GitHub backup upload', {
+          repo: `${this.githubOwner}/${this.githubRepo}`,
+          filePath: this.githubFilePath
+        });
+
+        backupPromises.push(
+          (async () => {
+            this.isBackupInProgress = true;
+            try {
+              const startTime = Date.now();
+
+              // Add timeout protection (10 seconds max for GitHub upload)
+              const timeoutPromise = new Promise<never>((_, reject) => {
+                setTimeout(() => reject(new Error('GitHub upload timeout (10s)')), 10000);
+              });
+
+              await Promise.race([
+                this.uploadToGitHub(data, fileContent),
+                timeoutPromise
+              ]);
+
+              const duration = Date.now() - startTime;
+
+              logger.info('GitHub backup completed', {
+                duration: `${duration}ms`,
+                repo: `${this.githubOwner}/${this.githubRepo}`
+              });
+
+              return { method: 'github', success: true };
+            } catch (error) {
+              logger.error('Failed to create GitHub backup', {
+                error: error instanceof Error ? error.message : error,
+                note: error instanceof Error && error.message.includes('timeout')
+                  ? 'Consider increasing timeout or disabling GitHub backup for shutdown'
+                  : undefined
+              });
+              return { method: 'github', success: false };
+            } finally {
+              this.isBackupInProgress = false;
+            }
+          })()
+        );
+      }
     }
 
     // Wait for all backups to complete
@@ -491,6 +499,54 @@ export class BackupManager {
     });
 
     if (!uploadResponse.ok) {
+      // On 409 Conflict (SHA mismatch from concurrent upload), re-fetch SHA and retry once
+      if (uploadResponse.status === 409) {
+        logger.warn('GitHub upload got 409 Conflict - re-fetching SHA and retrying', {
+          repo: `${this.githubOwner}/${this.githubRepo}`
+        });
+
+        const retryGetFile = await fetch(apiUrl, {
+          headers: {
+            'Authorization': `token ${this.githubToken}`,
+            'User-Agent': 'KEXP-DoublePlay-Scanner/1.0'
+          }
+        });
+
+        if (retryGetFile.ok) {
+          const retryFile = await retryGetFile.json() as GitHubFileResponse;
+          const retryPayload = {
+            message: commitMessage,
+            content: Buffer.from(fileContent).toString('base64'),
+            sha: retryFile.sha
+          };
+
+          const retryResponse = await fetch(apiUrl, {
+            method: 'PUT',
+            headers: {
+              'Authorization': `token ${this.githubToken}`,
+              'User-Agent': 'KEXP-DoublePlay-Scanner/1.0',
+              'Content-Type': 'application/json'
+            },
+            body: JSON.stringify(retryPayload)
+          });
+
+          if (!retryResponse.ok) {
+            const retryErrorText = await retryResponse.text();
+            throw new Error(`GitHub upload retry failed: ${retryResponse.status} ${retryResponse.statusText} - ${retryErrorText}`);
+          }
+
+          const retryResult = await retryResponse.json();
+          logger.info('GitHub backup created successfully (after 409 retry)', {
+            commitSha: (retryResult as any).commit?.sha,
+            commitMessage,
+            doublePlaysCount: data.doublePlays.length,
+            dateRange: `${data.startTime} to ${data.endTime}`,
+            repoUrl: `https://github.com/${this.githubOwner}/${this.githubRepo}`
+          });
+          return;
+        }
+      }
+
       const errorText = await uploadResponse.text();
       throw new Error(`GitHub upload failed: ${uploadResponse.status} ${uploadResponse.statusText} - ${errorText}`);
     }

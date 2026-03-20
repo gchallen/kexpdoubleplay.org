@@ -229,8 +229,23 @@ export class Scanner {
     console.log(chalk.dim(`   API server: http://localhost:${apiPort}\n`));
     logger.debug('API server started', { port: apiPort });
     
-    // Schedule periodic YouTube data updates (every 5 minutes)
-    this.youtubeUpdateTask = cron.schedule('*/5 * * * *', async () => {
+    // Schedule periodic backup checks (every 10 minutes)
+    this.backupCheckTask = cron.schedule('*/10 * * * *', async () => {
+      try {
+        await this.backupManager.checkAndBackup();
+      } catch (error) {
+        logger.error('Backup check failed', {
+          error: error instanceof Error ? error.message : error
+        });
+      }
+    });
+
+    // Start the backup check task
+    this.backupCheckTask.start();
+    logger.debug('Backup check scheduled every 10 minutes');
+
+    // Schedule periodic YouTube data updates (every 30 minutes)
+    this.youtubeUpdateTask = cron.schedule('*/30 * * * *', async () => {
       try {
         await this.youtubeManager.updateYouTubeData();
       } catch (error) {
@@ -243,7 +258,7 @@ export class Scanner {
     // Start the YouTube update task and perform initial update
     this.youtubeUpdateTask.start();
     await this.youtubeManager.updateYouTubeData(); // Initial update
-    logger.debug('YouTube data update scheduled every 5 minutes');
+    logger.debug('YouTube data update scheduled every 30 minutes');
   }
 
 

@@ -9,14 +9,14 @@ import { KEXPApi } from './api';
 import { ScanQueue } from './scan-queue';
 import {
   HealthResponseSchema,
-  DoubleePlaysResponseSchema,
+  DoublePlaysResponseSchema,
   PaginatedResponseSchema,
   StatsResponseSchema,
   ApiInfoResponseSchema,
   ErrorResponseSchema,
   PaginationQuerySchema,
   type HealthResponse,
-  type DoubleePlaysResponse,
+  type DoublePlaysResponse,
   type PaginatedResponse,
   type StatsResponse,
   type ApiInfoResponse,
@@ -221,7 +221,7 @@ export class ApiServer {
           retrievalStatus = 'stopped';
         }
         
-        const response: DoubleePlaysResponse = {
+        const response: DoublePlaysResponse = {
           startTime: enrichedData.startTime,
           endTime: enrichedData.endTime,
           totalCount: enrichedData.doublePlays.length,
@@ -243,7 +243,7 @@ export class ApiServer {
           }
         };
 
-        this.sendValidatedResponse(res, response, DoubleePlaysResponseSchema);
+        this.sendValidatedResponse(res, response, DoublePlaysResponseSchema);
       } catch (error) {
         const errorResponse: ErrorResponse = {
           error: 'Failed to load double plays data',

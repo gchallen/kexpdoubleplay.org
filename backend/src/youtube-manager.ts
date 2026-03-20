@@ -24,6 +24,8 @@ export class YouTubeManager {
   private githubRepo: string | null = null;
   private youtubeData: YouTubeData = {};
   private lastUpdate: Date | null = null;
+  private previousEntryCount = 0;
+  private lastETag: string | null = null;
   private readonly YOUTUBE_FILE = 'YouTube.yml';
 
   constructor() {
@@ -51,22 +53,36 @@ export class YouTubeManager {
   }
 
   /**
-   * Download YouTube.yml file from GitHub
+   * Download YouTube.yml file from GitHub, using ETag for conditional requests
+   * Returns null if content hasn't changed (304 Not Modified)
    */
-  private async downloadYouTubeData(): Promise<YouTubeData> {
+  private async downloadYouTubeData(): Promise<YouTubeData | null> {
     if (!this.isEnabled || !this.githubToken || !this.githubOwner || !this.githubRepo) {
       return {};
     }
 
     try {
       const apiUrl = `https://api.github.com/repos/${this.githubOwner}/${this.githubRepo}/contents/${this.YOUTUBE_FILE}`;
-      
-      const response = await fetch(apiUrl, {
-        headers: {
-          'Authorization': `token ${this.githubToken}`,
-          'User-Agent': 'KEXP-DoublePlay-Scanner/1.0'
-        }
-      });
+
+      const headers: Record<string, string> = {
+        'Authorization': `token ${this.githubToken}`,
+        'User-Agent': 'KEXP-DoublePlay-Scanner/1.0'
+      };
+
+      if (this.lastETag) {
+        headers['If-None-Match'] = this.lastETag;
+      }
+
+      const response = await fetch(apiUrl, { headers });
+
+      // 304 Not Modified - content unchanged
+      if (response.status === 304) {
+        logger.debug('YouTube data unchanged (304 Not Modified)', {
+          entriesCount: this.previousEntryCount,
+          file: this.YOUTUBE_FILE
+        });
+        return null;
+      }
 
       if (!response.ok) {
         if (response.status === 404) {
@@ -76,14 +92,30 @@ export class YouTubeManager {
         throw new Error(`GitHub API request failed: ${response.status} ${response.statusText}`);
       }
 
+      // Store ETag for next request
+      const etag = response.headers.get('etag');
+      if (etag) {
+        this.lastETag = etag;
+      }
+
       const fileData = await response.json() as { content: string; encoding: string };
       const decodedContent = Buffer.from(fileData.content, 'base64').toString('utf8');
       const data = YAML.parse(decodedContent) || {};
-      
-      logger.info('YouTube data updated from GitHub', {
-        entriesCount: Object.keys(data).length,
-        file: this.YOUTUBE_FILE
-      });
+
+      const newCount = Object.keys(data).length;
+      if (newCount !== this.previousEntryCount) {
+        logger.info('YouTube data updated from GitHub', {
+          entriesCount: newCount,
+          previousCount: this.previousEntryCount,
+          file: this.YOUTUBE_FILE
+        });
+      } else {
+        logger.debug('YouTube data refreshed from GitHub (unchanged)', {
+          entriesCount: newCount,
+          file: this.YOUTUBE_FILE
+        });
+      }
+      this.previousEntryCount = newCount;
 
       return data;
     } catch (error) {
@@ -104,9 +136,14 @@ export class YouTubeManager {
     }
 
     try {
-      this.youtubeData = await this.downloadYouTubeData();
+      const data = await this.downloadYouTubeData();
       this.lastUpdate = new Date();
-      
+
+      // null means 304 Not Modified - keep existing data
+      if (data !== null) {
+        this.youtubeData = data;
+      }
+
       logger.debug('YouTube data refresh completed', {
         entriesCount: Object.keys(this.youtubeData).length,
         lastUpdate: this.lastUpdate.toISOString()

@@ -94,6 +94,13 @@ export const ScannerInfoSchema = z.object({
   dataFileExists: z.boolean()
 });
 
+export const YouTubeStatusSchema = z.object({
+  enabled: z.boolean(),
+  lastUpdate: z.string().nullable(),
+  entriesCount: z.number(),
+  isStale: z.boolean()
+});
+
 // API Response Schemas
 export const HealthResponseSchema = z.object({
   status: z.enum(['starting', 'running', 'stopped', 'error']),
@@ -105,6 +112,7 @@ export const HealthResponseSchema = z.object({
   scanner: ScannerInfoSchema,
   scanningProgress: ScanningProgressSchema.nullable(),
   kexpApi: KEXPApiHealthSchema,
+  youtube: YouTubeStatusSchema.optional(),
   system: SystemInfoSchema,
   api: z.object({
     version: z.string(),
@@ -134,7 +142,7 @@ export const ClassificationCountsSchema = z.object({
   mistake: z.number()
 });
 
-export const DoubleePlaysResponseSchema = z.object({
+export const DoublePlaysResponseSchema = z.object({
   startTime: z.string(),
   endTime: z.string(),
   totalCount: z.number(),
@@ -246,10 +254,11 @@ export type MemoryUsage = z.infer<typeof MemoryUsageSchema>;
 export type SystemInfo = z.infer<typeof SystemInfoSchema>;
 export type KEXPApiHealth = z.infer<typeof KEXPApiHealthSchema>;
 export type ScannerInfo = z.infer<typeof ScannerInfoSchema>;
+export type YouTubeStatus = z.infer<typeof YouTubeStatusSchema>;
 export type HealthResponse = z.infer<typeof HealthResponseSchema>;
 export type TimeRange = z.infer<typeof TimeRangeSchema>;
 export type Metadata = z.infer<typeof MetadataSchema>;
-export type DoubleePlaysResponse = z.infer<typeof DoubleePlaysResponseSchema>;
+export type DoublePlaysResponse = z.infer<typeof DoublePlaysResponseSchema>;
 export type PaginatedResponse = z.infer<typeof PaginatedResponseSchema>;
 export type ArtistStat = z.infer<typeof ArtistStatSchema>;
 export type DJStat = z.infer<typeof DJStatSchema>;
