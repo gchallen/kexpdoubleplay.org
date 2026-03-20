@@ -100,7 +100,7 @@ app.get('/', async (req, res) => {
     const moonDisplay = isDarkMode ? 'none' : 'block';
     
     // Generate status text
-    const youtubeCount = sharedData.doublePlays.filter(dp => dp.youtube).length;
+    const youtubeCount = sharedData.doublePlays.filter(dp => dp.youtube_id).length;
     const statusText = `Showing ${sharedData.doublePlays.length} double plays${youtubeCount > 0 ? ` (${youtubeCount} with YouTube links)` : ''} • Last updated: ${sharedData.lastBackendFetch ? new Date(sharedData.lastBackendFetch).toLocaleString() : 'Never'}`;
     
     // Generate HTML for each double play
@@ -109,9 +109,9 @@ app.get('/', async (req, res) => {
       const trackNumber = index + 1;
       
       // YouTube play button (if available from backend)
-      const playButton = doublePlay.youtube 
+      const playButton = doublePlay.youtube_id
         ? `<div class="play-button">
-             <a href="${doublePlay.youtube.url}" target="_blank" rel="noopener" title="Play on YouTube">
+             <a href="https://www.youtube.com/watch?v=${doublePlay.youtube_id}" target="_blank" rel="noopener" title="Play on YouTube">
                <svg viewBox="0 0 24 24">
                  <polygon class="fill-black" points="5,3 19,12 5,21"></polygon>
                </svg>
@@ -165,7 +165,7 @@ app.get('/', async (req, res) => {
       .replace('{{STATUS_TEXT}}', statusText)
       .replace('{{DOUBLE_PLAYS_HTML}}', doublePlayHtml);
     
-    const totalWithYoutube = sharedData.doublePlays.filter(dp => dp.youtube).length;
+    const totalWithYoutube = sharedData.doublePlays.filter(dp => dp.youtube_id).length;
     console.log(`📄 Served page with ${sharedData.doublePlays.length} double plays (${totalWithYoutube} with YouTube)`);
     
     res.send(html);

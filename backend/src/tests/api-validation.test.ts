@@ -1,7 +1,7 @@
 import { test, expect } from 'bun:test';
 import { 
   HealthResponseSchema,
-  DoubleePlaysResponseSchema,
+  DoublePlaysResponseSchema,
   PaginatedResponseSchema,
   StatsResponseSchema,
   ApiInfoResponseSchema,
@@ -34,7 +34,7 @@ test('PaginationQuerySchema rejects invalid values', () => {
   }).toThrow();
 });
 
-test('DoubleePlaysResponseSchema validates response with counts', () => {
+test('DoublePlaysResponseSchema validates response with counts', () => {
   // Test the ClassificationCountsSchema separately first
   const counts = {
     legitimate: 2,

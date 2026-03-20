@@ -1,6 +1,6 @@
 {
   "name": "@kexp-doubleplay/types",
-  "version": "2025.8.0",
+  "version": "2026.3.0",
   "description": "Shared TypeScript types for KEXP Double Play Scanner",
   "main": "dist/index.js",
   "types": "dist/index.d.ts",

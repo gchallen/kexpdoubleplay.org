@@ -24,8 +24,8 @@ Returns comprehensive system health information including:
 - API version information
 
 ### 2. `/api/double-plays` - All Double Plays
-**Schema**: `DoubleePlaysResponseSchema`  
-**Type**: `DoubleePlaysResponse`
+**Schema**: `DoublePlaysResponseSchema`  
+**Type**: `DoublePlaysResponse`
 
 Returns complete dataset with metadata:
 - All double play entries with duration and classification

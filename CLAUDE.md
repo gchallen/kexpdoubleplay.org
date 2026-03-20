@@ -1,16 +1,16 @@
 # CLAUDE.md - Project Instructions for KEXP Double Play Scanner
 
 ## Project Overview
-This is a **multi-workspace project** consisting of a backend API service and a Next.js frontend for detecting and displaying KEXP radio double plays.
+This is a **multi-workspace project** consisting of a backend API service and a frontend for detecting and displaying KEXP radio double plays.
 
 ### Workspace Structure
 - **`backend/`**: TypeScript scanner service + REST API (uses Bun runtime)
-- **`frontend/`**: Next.js React application with KEXP-style UI
+- **`frontend/`**: Express SSR server with vanilla HTML/JS templates
 
 ## Key Technologies
 
 ### Backend
-- **Runtime**: Bun (not Node.js/npm)  
+- **Runtime**: Bun (not Node.js/npm)
 - **Language**: TypeScript 5.x
 - **HTTP Client**: node-fetch with connection pooling
 - **Logging**: Winston with structured JSON logging
@@ -18,10 +18,10 @@ This is a **multi-workspace project** consisting of a backend API service and a 
 - **API**: Express.js REST server
 - **Containerization**: Docker with multi-platform support
 
-### Frontend  
-- **Framework**: Next.js 15
-- **Language**: TypeScript 5.x
-- **Deployment**: Optimized for Vercel
+### Frontend
+- **Server**: Express.js with server-side HTML templating
+- **Language**: Vanilla JavaScript (no build step)
+- **Deployment**: Node.js server (Vercel or any hosting)
 
 ## Architecture Components
 
@@ -66,8 +66,9 @@ Environment variables are defined in `backend/src/config.ts`:
 See `backend/BACKEND.md` for complete environment variable reference.
 
 #### Frontend
-Environment variables in `.env.local`:
-- `NEXT_PUBLIC_API_URL`: Backend API endpoint
+Environment variables are set in `frontend/server.js`:
+- `PORT`: Server port (default: 8080)
+- `BACKEND_API_URL`: Hardcoded to `https://api.kexpdoubleplays.org`
 
 ### Testing
 
@@ -78,8 +79,8 @@ Environment variables in `.env.local`:
 - GitHub backup testing: `bun test:github`, `bun test:backup`
 
 #### Frontend
-- Next.js built-in testing with Jest and React Testing Library
-- Run tests with `bun test`
+- No test framework configured
+- Manual testing via `node server.js`
 
 ## Key Features to Preserve
 
@@ -128,21 +129,19 @@ Environment variables in `.env.local`:
 
 ### Frontend Development
 #### Adding New Features
-1. Create components in `frontend/src/components/`
-2. Use Next.js App Router for routing
-3. Connect to backend API endpoints
-4. Follow KEXP design aesthetic (minimal, clean)
-5. Ensure mobile responsiveness
+1. Edit `frontend/template.html` for layout changes
+2. Edit `frontend/server.js` for data processing and new routes
+3. Follow KEXP design aesthetic (minimal, clean)
+4. Ensure mobile responsiveness
 
 #### Debugging
-- Use Next.js dev mode: `bun dev`
+- Run: `node frontend/server.js`
 - Browser dev tools for client-side debugging
 - Network tab to monitor API calls
 
 #### Deployment
-- Build: `bun build` (in frontend directory)
-- Optimized for Vercel deployment
-- Set `NEXT_PUBLIC_API_URL` environment variable
+- Run: `node server.js` (in frontend directory)
+- Set `PORT` environment variable if needed
 
 ## Important Notes
 - Double plays are rare events - the JSON file won't grow large
