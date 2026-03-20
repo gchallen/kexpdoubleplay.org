@@ -20,7 +20,8 @@
     "compile": "mkdir -p dist && bun build --compile --target=bun-linux-arm64-musl --outfile=dist/kexp-doubleplay-backend-arm64 src/index.ts && bun build --compile --target=bun-linux-x64-musl --outfile=dist/kexp-doubleplay-backend-amd64 src/index.ts",
     "docker:build": "bun run compile && VERSION=$(node -p \"require('./package.json').version\") && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org:latest -t geoffreychallen/api-kexpdoubleplays-org:$VERSION .",
     "docker:run": "bun run docker:build && docker run --rm -it --env-file .env -p ${API_PORT:-3000}:3000 -v $(pwd)/data:/app/data -v $(pwd)/logs:/app/logs -v $(pwd)/backups:/app/backups geoffreychallen/api-kexpdoubleplays-org",
-    "docker:push": "bun run compile && VERSION=$(node -p \"require('./package.json').version\") && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org:latest -t geoffreychallen/api-kexpdoubleplays-org:$VERSION --push ."
+    "docker:push": "bun run compile && VERSION=$(node -p \"require('./package.json').version\") && docker buildx build --platform linux/amd64,linux/arm64 -t geoffreychallen/api-kexpdoubleplays-org:latest -t geoffreychallen/api-kexpdoubleplays-org:$VERSION --push .",
+    "deploy": "cd ../types && bun run build && cd ../backend && bun test && bun run docker:push && bun run k8s:restart"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner", "api"],
   "author": "",
