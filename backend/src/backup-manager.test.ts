@@ -1,9 +1,24 @@
-import { test, expect, describe, beforeEach, afterEach } from 'bun:test';
+import { test, expect, describe, beforeEach, afterEach, mock } from 'bun:test';
 import fs from 'fs';
 import path from 'path';
 import os from 'os';
-import { BackupManager } from './backup-manager';
 import { DoublePlayData } from '@kexp-doubleplay/types';
+
+// Mutable config path that tests can override before creating a BackupManager
+let testDataFilePath = './double-plays.json';
+mock.module('./config', () => ({
+  config: {
+    get dataFilePath() { return testDataFilePath; },
+    apiBaseUrl: 'https://api.kexp.org/v2',
+    rateLimitDelay: 1000,
+    scanIntervalMinutes: 5,
+    maxHoursPerRequest: 1,
+    apiPort: 3000,
+    backupIntervalHours: 24,
+  }
+}));
+
+import { BackupManager } from './backup-manager';
 
 // Helper to create a DoublePlayData fixture
 const makeData = (startTime: string, endTime: string, count = 0): DoublePlayData => ({
@@ -124,12 +139,10 @@ describe('BackupManager', () => {
       const tmpDir = createTempDir('backup-test-nodata-');
       const localBackupDir = path.join(tmpDir, 'backups');
       setLocalOnlyEnv(localBackupDir);
+      testDataFilePath = path.join(tmpDir, 'double-plays.json'); // does not exist
 
       const manager = new BackupManager();
 
-      // Change cwd so that ./double-plays.json does not exist
-      const originalCwd = process.cwd();
-      process.chdir(tmpDir);
       try {
         await manager.checkAndBackup();
 
@@ -140,7 +153,6 @@ describe('BackupManager', () => {
           expect(files.length).toBe(0);
         }
       } finally {
-        process.chdir(originalCwd);
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
@@ -148,16 +160,16 @@ describe('BackupManager', () => {
     test('skips on first call (records range but does not backup)', async () => {
       const tmpDir = createTempDir('backup-test-first-');
       const localBackupDir = path.join(tmpDir, 'backups');
+      const dataFile = path.join(tmpDir, 'double-plays.json');
       setLocalOnlyEnv(localBackupDir);
+      testDataFilePath = dataFile;
 
       const manager = new BackupManager();
 
-      // Write a data file in the temp directory
+      // Write a data file
       const data = makeData('2025-01-01T00:00:00Z', '2025-01-05T00:00:00Z');
-      fs.writeFileSync(path.join(tmpDir, 'double-plays.json'), JSON.stringify(data));
+      fs.writeFileSync(dataFile, JSON.stringify(data));
 
-      const originalCwd = process.cwd();
-      process.chdir(tmpDir);
       try {
         await manager.checkAndBackup();
 
@@ -168,7 +180,6 @@ describe('BackupManager', () => {
           expect(files.length).toBe(0);
         }
       } finally {
-        process.chdir(originalCwd);
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
@@ -176,16 +187,16 @@ describe('BackupManager', () => {
     test('triggers backup when date range expands by >= 1 day', async () => {
       const tmpDir = createTempDir('backup-test-expand-');
       const localBackupDir = path.join(tmpDir, 'backups');
+      const dataFile = path.join(tmpDir, 'double-plays.json');
       setLocalOnlyEnv(localBackupDir);
+      testDataFilePath = dataFile;
 
       const manager = new BackupManager();
 
-      const originalCwd = process.cwd();
-      process.chdir(tmpDir);
       try {
         // First call: record initial range
         const data1 = makeData('2025-01-01T00:00:00Z', '2025-01-05T00:00:00Z');
-        fs.writeFileSync(path.join(tmpDir, 'double-plays.json'), JSON.stringify(data1));
+        fs.writeFileSync(dataFile, JSON.stringify(data1));
         await manager.checkAndBackup();
 
         // Second call with same range: should not backup
@@ -198,7 +209,7 @@ describe('BackupManager', () => {
 
         // Third call with expanded range (end date moved forward by 2 days)
         const data2 = makeData('2025-01-01T00:00:00Z', '2025-01-07T00:00:00Z');
-        fs.writeFileSync(path.join(tmpDir, 'double-plays.json'), JSON.stringify(data2));
+        fs.writeFileSync(dataFile, JSON.stringify(data2));
         await manager.checkAndBackup();
 
         // Now a backup should have been created
@@ -214,7 +225,6 @@ describe('BackupManager', () => {
         expect(backupContent.startTime).toBe('2025-01-01T00:00:00Z');
         expect(backupContent.endTime).toBe('2025-01-07T00:00:00Z');
       } finally {
-        process.chdir(originalCwd);
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
@@ -279,19 +289,20 @@ describe('BackupManager', () => {
         .filter(f => f.startsWith('double-plays-') && f.endsWith('.json'));
       expect(files.length).toBe(15);
 
+      const dataFile = path.join(tmpDir, 'double-plays.json');
+      testDataFilePath = dataFile;
+
       const manager = new BackupManager();
 
-      const originalCwd = process.cwd();
-      process.chdir(tmpDir);
       try {
         // First call records the range (shouldBackup returns false)
         const data1 = makeData('2025-01-01T00:00:00Z', '2025-01-05T00:00:00Z');
-        fs.writeFileSync(path.join(tmpDir, 'double-plays.json'), JSON.stringify(data1));
+        fs.writeFileSync(dataFile, JSON.stringify(data1));
         await manager.checkAndBackup();
 
         // Second call with expanded range triggers backup + cleanup
         const data2 = makeData('2025-01-01T00:00:00Z', '2025-01-10T00:00:00Z');
-        fs.writeFileSync(path.join(tmpDir, 'double-plays.json'), JSON.stringify(data2));
+        fs.writeFileSync(dataFile, JSON.stringify(data2));
         await manager.checkAndBackup();
 
         // After cleanup, should have 10 files (15 existing - 5 oldest + 1 new = 11, then cleanup keeps 10)
@@ -300,7 +311,6 @@ describe('BackupManager', () => {
           .filter(f => f.startsWith('double-plays-') && f.endsWith('.json'));
         expect(files.length).toBe(10);
       } finally {
-        process.chdir(originalCwd);
         fs.rmSync(tmpDir, { recursive: true, force: true });
       }
     });
