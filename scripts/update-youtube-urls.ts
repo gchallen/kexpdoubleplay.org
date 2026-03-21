@@ -512,11 +512,12 @@ async function main(): Promise<void> {
           const { artist, song, album } = doublePlay.plays[0].kexpPlay;
           const key = createTrackKey(artist, song, album);
           
-          // Collect all durations for this track
+          // Collect all durations for this track, filtering out obviously wrong values
+          // (< 30s is a measurement artifact from gap between plays, not a real song length)
           const durations = doublePlay.plays
             .map(play => play.duration)
-            .filter((duration): duration is number => duration !== undefined && duration !== null);
-          
+            .filter((duration): duration is number => duration !== undefined && duration !== null && duration >= 30);
+
           if (durations.length > 0) {
             durationMap.set(key, durations);
           }
@@ -546,9 +547,9 @@ async function main(): Promise<void> {
         const firstPlay = doublePlay.plays[0];
         if (firstPlay?.kexpPlay) {
           const { artist, song, album } = firstPlay.kexpPlay;
-          const duration = firstPlay.duration;
+          const duration = firstPlay.duration !== undefined && firstPlay.duration >= 30 ? firstPlay.duration : undefined;
           const key = createTrackKey(artist, song, album);
-          
+
           // Check if entry exists
           if (youtubeData[key]) {
             // Entry already exists, skip

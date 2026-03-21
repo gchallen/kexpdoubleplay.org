@@ -45,10 +45,19 @@ export class YouTubeManager {
    * Create a track key from artist, title, and album (matches the format in YouTube.yml)
    */
   private createTrackKey(artist: string, title: string, album: string | null): string {
-    const albumPart = album ? album.toLowerCase().replace(/[^a-z0-9]+/g, '_') : 'no_album';
-    const artistPart = artist.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    const titlePart = title.toLowerCase().replace(/[^a-z0-9]+/g, '_');
-    
+    const normalize = (str: string): string => {
+      return str
+        .toLowerCase()
+        .replace(/[^a-z0-9\s]/g, '')
+        .replace(/\s+/g, '_')
+        .replace(/_+/g, '_')
+        .replace(/^_|_$/g, '');
+    };
+
+    const artistPart = normalize(artist);
+    const titlePart = normalize(title);
+    const albumPart = album ? normalize(album) : 'no_album';
+
     return `${artistPart}__${titlePart}__${albumPart}`;
   }
 
