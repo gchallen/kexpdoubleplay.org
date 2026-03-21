@@ -1,0 +1,18 @@
+{
+  "name": "kexpdoubleplays-worker",
+  "version": "2026.3.0",
+  "private": true,
+  "scripts": {
+    "dev": "wrangler dev",
+    "deploy": "cd ../types && bun run build && cd ../worker && wrangler deploy",
+    "tail": "wrangler tail"
+  },
+  "dependencies": {
+    "@kexp-doubleplay/types": "workspace:*"
+  },
+  "devDependencies": {
+    "@cloudflare/workers-types": "4.20250313.0",
+    "typescript": "5.9.3",
+    "wrangler": "4.14.1"
+  }
+}

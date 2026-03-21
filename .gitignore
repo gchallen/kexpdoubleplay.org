@@ -36,3 +36,7 @@ coverage/
 # Backup and keys directories
 /keys
 backend/backups
+
+# Wrangler
+.wrangler/
+worker/seed*.sql

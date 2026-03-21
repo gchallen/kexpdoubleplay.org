@@ -1,0 +1,216 @@
+import type { DoublePlay } from "@kexp-doubleplay/types";
+import type { Env } from "./types";
+import {
+  type DoublePlayRow,
+  type ScanStateRow,
+  rowToDoublePlay,
+} from "./db";
+
+export async function renderFrontend(
+  request: Request,
+  env: Env,
+): Promise<Response> {
+  const { results: rows } = await env.DB.prepare(
+    "SELECT * FROM double_plays ORDER BY first_play_timestamp DESC",
+  ).all<DoublePlayRow>();
+
+  const doublePlays = rows.map(rowToDoublePlay);
+
+  const state = await env.DB.prepare(
+    "SELECT * FROM scan_state WHERE id = 1",
+  ).first<ScanStateRow>();
+  const lastFetch = state?.last_scan_time || state?.end_time || null;
+
+  // Theme from cookie
+  const cookies = request.headers.get("cookie") || "";
+  const isDark = /theme=dark/.test(cookies);
+  const themeClass = isDark ? "dark" : "";
+  const sunDisplay = isDark ? "block" : "none";
+  const moonDisplay = isDark ? "none" : "block";
+
+  const ytCount = doublePlays.filter((dp) => dp.youtube_id).length;
+  const statusText = `Showing ${doublePlays.length} double plays${ytCount > 0 ? ` (${ytCount} with YouTube links)` : ""} &bull; Last updated: <span class="timestamp" data-ts="${lastFetch || ""}"></span>`;
+
+  const items = doublePlays.map((dp, i) => renderItem(dp, i)).join("");
+
+  const html = TEMPLATE.replace("{{THEME_CLASS}}", themeClass)
+    .replace("{{SUN_DISPLAY}}", sunDisplay)
+    .replace("{{MOON_DISPLAY}}", moonDisplay)
+    .replace("{{STATUS_TEXT}}", statusText)
+    .replace("{{DOUBLE_PLAYS_HTML}}", items);
+
+  return new Response(html, {
+    headers: { "Content-Type": "text/html;charset=UTF-8" },
+  });
+}
+
+function renderItem(dp: DoublePlay, i: number): string {
+  const first = dp.plays[0];
+
+  const playBtn = dp.youtube_id
+    ? `<div class="play-button">
+         <a href="https://www.youtube.com/watch?v=${dp.youtube_id}" target="_blank" rel="noopener" title="Play on YouTube">
+           <svg viewBox="0 0 24 24"><polygon class="fill-black" points="5,3 19,12 5,21"></polygon></svg>
+         </a>
+       </div>`
+    : `<div class="play-button invisible"></div>`;
+
+  const coverUri = dp.youtube_id
+    ? `https://img.youtube.com/vi/${dp.youtube_id}/mqdefault.jpg`
+    : dp.plays.find((p) => p.kexpPlay.image_uri)?.kexpPlay.image_uri;
+  const cover = coverUri
+    ? `<div class="album-cover-container"><img src="${coverUri}" alt="Album cover" class="album-cover" loading="lazy"></div>`
+    : "";
+
+  return `<div class="playlist-item">
+  <div class="item-content">
+    <div class="track-number">${i + 1}</div>
+    ${playBtn}
+    <div class="timestamp" data-ts="${first.timestamp}"></div>
+    <div class="track-info">
+      <div class="track-line">
+        <span class="track-title">${dp.title}</span>
+        <span class="artist-name">by ${dp.artist}</span>
+        ${first.kexpPlay.album ? `<span class="release-year">(${first.kexpPlay.album})</span>` : ""}
+      </div>
+      <div class="show-dj-line">
+        ${dp.dj ? `<span class="dj-name">${dp.dj}</span>` : ""}
+        ${dp.dj && dp.show ? `<span class="separator"> &bull; </span>` : ""}
+        ${dp.show ? `<span class="show-name">${dp.show}</span>` : ""}
+      </div>
+    </div>
+    <div class="album-covers">${cover}</div>
+  </div>
+</div>`;
+}
+
+const TEMPLATE = `<!DOCTYPE html>
+<html lang="en" class="{{THEME_CLASS}}">
+<head>
+    <meta charset="UTF-8">
+    <meta name="viewport" content="width=device-width, initial-scale=1.0">
+    <title>KEXP Double Plays</title>
+    <style>
+        * { margin: 0; padding: 0; box-sizing: border-box; }
+        body {
+            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
+            line-height: 1.6; background-color: white; color: black;
+            transition: background-color 0.2s, color 0.2s;
+        }
+        .dark body { background-color: #111; color: white; }
+        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .header {
+            display: flex; justify-content: space-between; align-items: center;
+            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #e5e5e5;
+        }
+        .dark .header { border-bottom-color: #333; }
+        h1 { font-size: 2.5rem; font-weight: 300; color: black; }
+        .dark h1 { color: white; }
+        .theme-toggle {
+            background: none; border: 1px solid #ddd; padding: 8px; border-radius: 4px;
+            cursor: pointer; color: inherit; transition: border-color 0.2s, background-color 0.2s;
+            display: flex; align-items: center; justify-content: center;
+        }
+        .theme-toggle:hover { background-color: #f5f5f5; border-color: #ccc; }
+        .dark .theme-toggle { border-color: #555; }
+        .dark .theme-toggle:hover { background-color: #222; border-color: #666; }
+        .theme-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
+        .status-info { margin-bottom: 20px; font-size: 0.9rem; color: #666; }
+        .dark .status-info { color: #aaa; }
+        .playlist-item { padding: 20px; border-bottom: 1px solid #f0f0f0; transition: background-color 0.2s; }
+        .playlist-item:hover { background-color: #fafafa; }
+        .dark .playlist-item { border-bottom-color: #222; }
+        .dark .playlist-item:hover { background-color: #1a1a1a; }
+        .item-content { display: flex; align-items: center; width: 100%; }
+        .track-number { flex-shrink: 0; margin-right: 16px; width: 32px; text-align: right; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace; font-size: 0.875rem; color: #666; }
+        .dark .track-number { color: #aaa; }
+        .play-button { flex-shrink: 0; margin-right: 12px; width: 32px; height: 32px; }
+        .play-button a { display: block; transition: opacity 0.2s; }
+        .play-button a:hover { opacity: 0.8; }
+        .play-button.invisible { visibility: hidden; }
+        .play-button svg { width: 32px; height: 32px; }
+        .play-button .fill-black { fill: black; }
+        .dark .play-button .fill-black { fill: white; }
+        .timestamp { flex-shrink: 0; width: 128px; font-size: 0.75rem; color: #666; }
+        .dark .timestamp { color: #aaa; }
+        .track-info { flex: 1; margin: 0 16px; }
+        .track-line { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
+        .track-title { font-size: 1.1rem; font-weight: 400; color: black; }
+        .dark .track-title { color: white; }
+        .artist-name { font-size: 1.1rem; font-weight: 300; color: #555; }
+        .dark .artist-name { color: #ccc; }
+        .release-year { font-size: 0.875rem; font-style: italic; color: #666; text-transform: none; }
+        .dark .release-year { color: #aaa; }
+        .show-dj-line { font-size: 0.9rem; font-weight: 400; color: #333; }
+        .dark .show-dj-line { color: #ddd; }
+        .dj-name { font-weight: 600; }
+        .show-name { font-weight: 400; }
+        .separator { color: #999; font-weight: 300; }
+        .album-covers { display: flex; gap: 8px; flex-shrink: 0; }
+        .album-cover-container { width: 64px; height: 64px; background-color: #f0f0f0; display: flex; align-items: center; justify-content: center; }
+        .dark .album-cover-container { background-color: #2a2a2a; }
+        .album-cover { width: 64px; height: 64px; object-fit: cover; opacity: 0; transition: opacity 0.2s; }
+        .album-cover.loaded { opacity: 1; }
+        @media (max-width: 768px) {
+            .container { padding: 15px; }
+            .header { flex-direction: column; gap: 15px; }
+            h1 { font-size: 2rem; }
+            .item-content { flex-wrap: wrap; }
+            .track-number { width: 24px; margin-right: 12px; }
+            .timestamp { width: 100px; font-size: 0.7rem; }
+            .track-info { margin: 0 12px; min-width: 200px; }
+            .track-line { gap: 6px; margin-bottom: 4px; }
+            .track-title { font-size: 1rem; }
+            .artist-name { font-size: 1rem; }
+            .release-year { font-size: 0.8rem; }
+            .show-dj-line { font-size: 0.85rem; gap: 6px; }
+            .album-covers { gap: 6px; }
+            .album-cover-container { width: 48px; height: 48px; }
+            .album-cover { width: 48px; height: 48px; }
+        }
+    </style>
+</head>
+<body>
+    <div class="container">
+        <header class="header">
+            <h1>KEXP Double Plays</h1>
+            <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
+                <svg class="theme-icon sun-icon" style="display:{{SUN_DISPLAY}}" viewBox="0 0 24 24">
+                    <circle cx="12" cy="12" r="5"/>
+                    <path d="m12 1v2m0 18v2M4.22 4.22l1.42 1.42m12.72 12.72l1.42 1.42M1 12h2m18 0h2M4.22 19.78l1.42-1.42M18.36 5.64l1.42-1.42"/>
+                </svg>
+                <svg class="theme-icon moon-icon" style="display:{{MOON_DISPLAY}}" viewBox="0 0 24 24">
+                    <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
+                </svg>
+            </button>
+        </header>
+        <div class="status-info">{{STATUS_TEXT}}</div>
+        <div class="playlist">{{DOUBLE_PLAYS_HTML}}</div>
+    </div>
+    <script>
+        function toggleTheme() {
+            var html = document.documentElement;
+            var sun = document.querySelector('.sun-icon');
+            var moon = document.querySelector('.moon-icon');
+            var isDark = html.classList.contains('dark');
+            if (isDark) {
+                html.classList.remove('dark');
+                document.cookie = 'theme=light; path=/; max-age=31536000';
+                sun.style.display = 'none'; moon.style.display = 'block';
+            } else {
+                html.classList.add('dark');
+                document.cookie = 'theme=dark; path=/; max-age=31536000';
+                sun.style.display = 'block'; moon.style.display = 'none';
+            }
+        }
+        document.querySelectorAll('.timestamp[data-ts]').forEach(function(el) {
+            var ts = el.getAttribute('data-ts');
+            el.textContent = ts ? new Date(ts).toLocaleString() : 'Never';
+        });
+        document.querySelectorAll('.album-cover').forEach(function(img) {
+            img.onload = function() { img.classList.add('loaded'); };
+            img.onerror = function() { img.style.opacity = '0'; };
+        });
+    </script>
+</body>
+</html>`;

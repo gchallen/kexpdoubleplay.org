@@ -6,7 +6,8 @@
   "workspaces": [
     "types",
     "backend",
-    "frontend"
+    "frontend",
+    "worker"
   ],
   "scripts": {
     "backend": "bun --filter=backend dev",
