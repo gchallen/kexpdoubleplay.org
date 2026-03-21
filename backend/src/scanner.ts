@@ -27,6 +27,7 @@ export class Scanner {
   private isRunning = false;
   private apiServer?: ApiServer;
   private scanQueue?: ScanQueue;
+  private backupCheckTask?: cron.ScheduledTask;
   private youtubeUpdateTask?: cron.ScheduledTask;
   private options: CLIOptions;
 
@@ -349,6 +350,12 @@ export class Scanner {
     this.isRunning = false;
     console.log(chalk.yellow('\n📴 Scanner stopping...'));
     
+    // Stop backup check task
+    if (this.backupCheckTask) {
+      this.backupCheckTask.stop();
+      logger.debug('Stopped backup check task');
+    }
+
     // Stop YouTube update task
     if (this.youtubeUpdateTask) {
       this.youtubeUpdateTask.stop();

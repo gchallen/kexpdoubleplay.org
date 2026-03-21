@@ -12,6 +12,7 @@
     "backend": "bun --filter=backend dev",
     "frontend": "bun --filter=frontend dev",
     "build": "bun --filter=types build && bun --filter=backend build && bun --filter=frontend build",
+    "check": "cd types && bun run build && cd ../backend && bun run tsc && bun test",
     "test": "bun --filter=backend test && bun --filter=frontend test",
     "update-youtube": "bun run scripts/update-youtube-urls.ts"
   },
@@ -19,9 +20,9 @@
   "author": "",
   "license": "ISC",
   "dependencies": {
-    "dotenv": "17.2.2",
-    "puppeteer": "24.18.0",
-    "yaml": "2.8.1"
+    "dotenv": "17.3.1",
+    "puppeteer": "24.40.0",
+    "yaml": "2.8.3"
   },
   "devDependencies": {
     "@types/yaml": "1.9.7"
