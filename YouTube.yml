@@ -36,6 +36,15 @@ better_joy__steamroller__steamroller:
   search_url: https://www.youtube.com/results?search_query=Better%20Joy%20steamroller
   title: steamroller
   youtube_id: qh0U_7Yi8To
+bob_dylan__masters_of_war__the_freewheelin_bob_dylan:
+  album: The Freewheelin’ Bob Dylan
+  artist: Bob Dylan
+  duration: 12
+  durations:
+    - 12
+  search_url: https://www.youtube.com/results?search_query=Bob%20Dylan%20Masters%20of%20War
+  title: Masters of War
+  youtube_id: JEmI_FT4YHU
 brownout__dont_believe_the_hype__fear_of_a_brown_planet:
   album: Fear of a Brown Planet
   artist: Brownout
@@ -66,6 +75,16 @@ clinton_fearon__richman_poorman__no_album:
   search_url: https://www.youtube.com/results?search_query=Clinton%20Fearon%20Richman%20Poorman
   title: Richman Poorman
   youtube_id: nz_zu-ihmk0
+cyndi_lauper__all_through_the_night__shes_so_unusual:
+  album: She’s So Unusual
+  artist: Cyndi Lauper
+  duration: 0
+  durations:
+    - 0
+    - 0
+  search_url: https://www.youtube.com/results?search_query=Cyndi%20Lauper%20All%20Through%20the%20Night
+  title: All Through the Night
+  youtube_id: ZONKoKIQ9RY
 dj_riz__live_from_brooklyn__12_inch_single:
   album: 12" Inch Single
   artist: DJ Riz
@@ -97,6 +116,15 @@ fashion_club__one_day__a_love_you_cannot_shake:
   search_url: https://www.youtube.com/results?search_query=Fashion%20Club%20One%20Day
   title: One Day
   youtube_id: NASJ91KOC1g
+feral_family__endless_night__endless_night:
+  album: Endless Night
+  artist: Feral Family
+  duration: 213
+  durations:
+    - 213
+  search_url: https://www.youtube.com/results?search_query=Feral%20Family%20Endless%20Night
+  title: Endless Night
+  youtube_id: lmga4vrVpdw
 found_space__nostalgia__nostalgia:
   album: nostalgia
   artist: Found Space
@@ -116,6 +144,15 @@ goat_mc_yallah__nimerudi__nimerudi:
   search_url: https://www.youtube.com/results?search_query=Goat%20%26%20MC%20Yallah%20Nimerudi
   title: Nimerudi
   youtube_id: msjLFlNBlR0
+hannah_lew__sunday__hannah_lew:
+  album: Hannah Lew
+  artist: Hannah Lew
+  duration: 218
+  durations:
+    - 218
+  search_url: https://www.youtube.com/results?search_query=Hannah%20Lew%20Sunday
+  title: Sunday
+  youtube_id: Azrkq3_g0KE
 id__id__no_album:
   album: null
   artist: ID
@@ -150,9 +187,8 @@ jay_som_feat_jim_adkins__float__belong:
 jeff_tweedy__bad_day_lately__love_is_the_king:
   album: Love Is the King
   artist: Jeff Tweedy
-  duration: 7
+  duration: 185
   durations:
-    - 7
     - 185
   search_url: https://www.youtube.com/results?search_query=Jeff%20Tweedy%20Bad%20Day%20Lately
   title: Bad Day Lately
@@ -183,7 +219,6 @@ miki_berenyi_trio__vertigo__tripla:
   duration: 262
   durations:
     - 262
-    - 5
   search_url: https://www.youtube.com/results?search_query=Miki%20Berenyi%20Trio%20Vertigo
   title: Vertigo
   youtube_id: sr9rYHCPNR0
@@ -213,7 +248,6 @@ new_order__age_of_consent__power_corruption_lies:
   duration: 319
   durations:
     - 319
-    - 15
   search_url: https://www.youtube.com/results?search_query=New%20Order%20Age%20of%20Consent
   title: Age of Consent
   youtube_id: hZXxmhok1AU
@@ -237,6 +271,15 @@ pulp__spike_island__more:
   search_url: https://www.youtube.com/results?search_query=Pulp%20Spike%20Island
   title: Spike Island
   youtube_id: -27a1ugJX8U
+reggie_watts__have_yourself_a_merry_little_christmas__no_album:
+  album: null
+  artist: Reggie Watts
+  duration: 0
+  durations:
+    - 0
+  search_url: https://www.youtube.com/results?search_query=Reggie%20Watts%20Have%20Yourself%20a%20Merry%20Little%20Christmas
+  title: Have Yourself a Merry Little Christmas
+  youtube_id: qpHJ4jqu8D8
 sam_spence__lets_go_big_o__music_from_nfl_films_vol_1:
   album: Music From NFL Films, Vol. 1
   artist: Sam Spence
@@ -247,12 +290,20 @@ sam_spence__lets_go_big_o__music_from_nfl_films_vol_1:
   search_url: https://www.youtube.com/results?search_query=Sam%20Spence%20Let's%20Go%20Big%20%22O%22
   title: Let's Go Big "O"
   youtube_id: 7HheqAzrV_o
+serafima_and_the_shakedowns__ride_easy__ride_easy:
+  album: Ride Easy
+  artist: Serafima and the Shakedowns
+  duration: 5
+  durations:
+    - 5
+  search_url: https://www.youtube.com/results?search_query=Serafima%20and%20the%20Shakedowns%20Ride%20Easy
+  title: Ride Easy
+  youtube_id: ySyDTk2FdX8
 sexores__nightbreed__no_album:
   album: null
   artist: Sexores
-  duration: 14
+  duration: 190
   durations:
-    - 14
     - 190
   search_url: https://www.youtube.com/results?search_query=Sexores%20Nightbreed
   title: Nightbreed
@@ -299,9 +350,8 @@ sochi__tlajomulco__no_album:
 stubbleman__an_everlasting_universe_of_things__14643_the_ventoux_trilogy:
   album: 1:46:43 -  The Ventoux Trilogy
   artist: Stubbleman
-  duration: 2
+  duration: 373
   durations:
-    - 2
     - 373
   search_url: https://www.youtube.com/results?search_query=Stubbleman%20An%20Everlasting%20Universe%20of%20Things
   title: An Everlasting Universe of Things
@@ -326,6 +376,15 @@ tears_for_fears__everybody_wants_to_rule_the_world__songs_from_the_big_chair:
   search_url: https://www.youtube.com/results?search_query=Tears%20for%20Fears%20Everybody%20Wants%20to%20Rule%20the%20World
   title: Everybody Wants to Rule the World
   youtube_id: aGCdLKXNF3w
+the_beths__straight_line_was_a_lie__straight_line_was_a_lie:
+  album: Straight Line Was a Lie
+  artist: The Beths
+  duration: 6
+  durations:
+    - 6
+  search_url: https://www.youtube.com/results?search_query=The%20Beths%20Straight%20Line%20Was%20a%20Lie
+  title: Straight Line Was a Lie
+  youtube_id: vU0Q8DKWhQk
 the_postal_service__such_great_heights__give_up:
   album: Give Up
   artist: The Postal Service
@@ -445,3 +504,4 @@ zookraught__laughingstock__live_on_kexp:
   search_url: https://www.youtube.com/results?search_query=Zookraught%20Laughingstock
   title: Laughingstock
   youtube_id: guHQCzkry5Q
+
