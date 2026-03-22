@@ -19,22 +19,28 @@ export async function renderFrontend(
   // Parse filters from URL
   const url = new URL(request.url);
   const showAll = url.searchParams.get("show") === "all";
-  const djFilter = url.searchParams.get("dj") || "";
+  const djParam = url.searchParams.get("dj") || "";
+  const selectedDJs = new Set(djParam ? djParam.split(",") : []);
 
-  // Collect unique DJs for the dropdown
-  const djSet = new Set<string>();
+  // Count plays per DJ (respecting the show-all toggle)
+  const djCounts = new Map<string, number>();
   for (const dp of allPlays) {
-    if (dp.dj) djSet.add(dp.dj);
+    if (!dp.dj) continue;
+    if (!showAll && dp.classification === "mistake") continue;
+    djCounts.set(dp.dj, (djCounts.get(dp.dj) || 0) + 1);
   }
-  const djList = [...djSet].sort((a, b) => a.localeCompare(b));
+  // Only DJs with >1 double play, sorted by count desc then name
+  const djList = [...djCounts.entries()]
+    .filter(([, count]) => count > 1)
+    .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   // Apply filters
   let doublePlays = allPlays;
   if (!showAll) {
     doublePlays = doublePlays.filter((dp) => dp.classification !== "mistake");
   }
-  if (djFilter) {
-    doublePlays = doublePlays.filter((dp) => dp.dj === djFilter);
+  if (selectedDJs.size > 0) {
+    doublePlays = doublePlays.filter((dp) => dp.dj && selectedDJs.has(dp.dj));
   }
 
   const state = await env.DB.prepare(
@@ -52,12 +58,15 @@ export async function renderFrontend(
   const ytCount = doublePlays.filter((dp) => dp.youtube_id).length;
   const totalCount = allPlays.filter((dp) => dp.classification !== "mistake").length;
   const mistakeCount = allPlays.filter((dp) => dp.classification === "mistake").length;
-  const filterDesc = djFilter ? ` by ${djFilter}` : "";
+  const filterDesc = selectedDJs.size > 0 ? ` by ${[...selectedDJs].join(", ")}` : "";
   const statusText = `Showing ${doublePlays.length} of ${totalCount} double plays${filterDesc}${mistakeCount > 0 && showAll ? ` (includes ${mistakeCount} mistakes)` : ""}${ytCount > 0 ? ` &bull; ${ytCount} with YouTube` : ""} &bull; Last updated: <span class="timestamp" data-ts="${lastFetch || ""}"></span>`;
 
-  // Build DJ options
+  // Build DJ checkboxes
   const djOptions = djList
-    .map((dj) => `<option value="${escAttr(dj)}"${dj === djFilter ? " selected" : ""}>${escAttr(dj)}</option>`)
+    .map(([dj, count]) => {
+      const checked = selectedDJs.has(dj) ? " checked" : "";
+      return `<label class="dj-chip"><input type="checkbox" class="dj-cb" value="${escAttr(dj)}" onchange="applyFilters()"${checked}><span>${escAttr(dj)} (${count})</span></label>`;
+    })
     .join("");
 
   const items = doublePlays.map((dp, i) => renderItem(dp, i)).join("");
@@ -85,9 +94,9 @@ function renderItem(dp: DoublePlay, i: number): string {
 
   const playBtn = dp.youtube_id
     ? `<div class="play-button">
-         <button class="play-btn" data-yt="${dp.youtube_id}" title="Play">
-           <svg viewBox="0 0 24 24" class="play-icon"><polygon class="fill-black" points="5,3 19,12 5,21"></polygon></svg>
-           <svg viewBox="0 0 24 24" class="pause-icon" style="display:none"><rect class="fill-black" x="5" y="3" width="4" height="18"></rect><rect class="fill-black" x="15" y="3" width="4" height="18"></rect></svg>
+         <button class="play-btn" data-yt="${dp.youtube_id}" title="Play" style="position:relative;width:32px;height:32px">
+           <svg viewBox="0 0 24 24" class="play-icon" style="position:absolute;inset:0"><polygon class="fill-black" points="5,3 19,12 5,21"></polygon></svg>
+           <svg viewBox="0 0 24 24" class="pause-icon" style="position:absolute;inset:0;display:none"><rect class="fill-black" x="5" y="3" width="4" height="18"></rect><rect class="fill-black" x="15" y="3" width="4" height="18"></rect></svg>
          </button>
        </div>`
     : `<div class="play-button invisible"></div>`;
@@ -160,12 +169,17 @@ const TEMPLATE = `<!DOCTYPE html>
         .filter-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
         .filter-bar label { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 6px; cursor: pointer; }
         .dark .filter-bar label { color: #bbb; }
-        .filter-bar select {
-            font-size: 0.85rem; padding: 4px 8px; border: 1px solid #ddd; border-radius: 4px;
-            background: white; color: inherit; cursor: pointer;
-        }
-        .dark .filter-bar select { background: #222; border-color: #444; color: #ddd; }
         .filter-bar input[type="checkbox"] { cursor: pointer; }
+        .dj-filters { display: flex; flex-wrap: wrap; gap: 6px; }
+        .dj-chip { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: #555;
+            padding: 2px 8px; border: 1px solid #ddd; border-radius: 12px; cursor: pointer;
+            transition: background-color 0.15s, border-color 0.15s; }
+        .dj-chip:hover { background: #f0f0f0; }
+        .dj-chip:has(input:checked) { background: #e8f0fe; border-color: #4285f4; color: #1a56db; }
+        .dark .dj-chip { color: #bbb; border-color: #444; }
+        .dark .dj-chip:hover { background: #2a2a2a; }
+        .dark .dj-chip:has(input:checked) { background: #1a2744; border-color: #4285f4; color: #8ab4f8; }
+        .dj-chip input[type="checkbox"] { cursor: pointer; }
         .playlist-item { padding: 20px; border-bottom: 1px solid #f0f0f0; transition: background-color 0.2s; }
         .playlist-item:hover { background-color: #fafafa; }
         .dark .playlist-item { border-bottom-color: #222; }
@@ -283,16 +297,11 @@ const TEMPLATE = `<!DOCTYPE html>
         </header>
         <div class="status-info">{{STATUS_TEXT}}</div>
         <div class="filter-bar">
-            <label>
-                <select id="dj-filter" onchange="applyFilters()">
-                    <option value="">All DJs</option>
-                    {{DJ_OPTIONS}}
-                </select>
-            </label>
             <label title="Include {{MISTAKE_COUNT}} entries that may be data errors">
                 <input type="checkbox" id="show-all" onchange="applyFilters()"{{SHOW_ALL_CHECKED}}>
                 Show mistakes
             </label>
+            <div class="dj-filters">{{DJ_OPTIONS}}</div>
         </div>
         <div id="player-bar" class="player-bar">
             <img class="pb-thumb" id="pb-thumb" src="" alt="" style="visibility:hidden">
@@ -302,8 +311,9 @@ const TEMPLATE = `<!DOCTYPE html>
             </div>
             <div class="pb-controls">
                 <button onclick="skipPrev()" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
-                <button onclick="togglePlay()" id="pb-play-btn" title="Play/Pause"><svg viewBox="0 0 24 24"><polygon id="pb-play-icon" points="5,3 19,12 5,21"/></svg><svg viewBox="0 0 24 24" id="pb-pause-icon" style="display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg></button>
+                <button onclick="togglePlay()" id="pb-play-btn" title="Play/Pause" style="position:relative;width:22px;height:22px"><svg viewBox="0 0 24 24" id="pb-play-icon" style="position:absolute;inset:0"><polygon points="5,3 19,12 5,21"/></svg><svg viewBox="0 0 24 24" id="pb-pause-icon" style="position:absolute;inset:0;display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg></button>
                 <button onclick="skipNext()" title="Next"><svg viewBox="0 0 24 24"><path d="M6 18l8.5-6L6 6v12zM16 6v12h2V6h-2z"/></svg></button>
+                <button onclick="toggleShuffle()" id="pb-shuffle-btn" title="Shuffle" style="opacity:0.4"><svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
             </div>
             <div class="pb-seek">
                 <span class="pb-time" id="pb-cur">0:00</span>
@@ -346,9 +356,10 @@ const TEMPLATE = `<!DOCTYPE html>
         /* ── Filters ── */
         function applyFilters() {
             var params = new URLSearchParams();
-            var dj = document.getElementById('dj-filter').value;
             var showAll = document.getElementById('show-all').checked;
-            if (dj) params.set('dj', dj);
+            var djs = [];
+            document.querySelectorAll('.dj-cb:checked').forEach(function(cb) { djs.push(cb.value); });
+            if (djs.length > 0) params.set('dj', djs.join(','));
             if (showAll) params.set('show', 'all');
             var qs = params.toString();
             window.location.href = window.location.pathname + (qs ? '?' + qs : '');
@@ -361,6 +372,9 @@ const TEMPLATE = `<!DOCTYPE html>
         var duration = 0;
         var draggingSeek = false;
         var timeInterval = null;
+        var shuffleOn = false;
+        var shuffleOrder = [];
+        var shufflePos = 0;
 
         // Build ordered list of playable tracks
         var tracks = [];
@@ -374,6 +388,17 @@ const TEMPLATE = `<!DOCTYPE html>
             });
         });
 
+        // Fisher-Yates shuffle
+        function generateShuffleOrder() {
+            var indices = [];
+            for (var i = 0; i < tracks.length; i++) indices.push(i);
+            for (var i = indices.length - 1; i > 0; i--) {
+                var j = Math.floor(Math.random() * (i + 1));
+                var tmp = indices[i]; indices[i] = indices[j]; indices[j] = tmp;
+            }
+            return indices;
+        }
+
         function fmtTime(s) {
             s = Math.floor(s);
             var m = Math.floor(s / 60);
@@ -386,6 +411,29 @@ const TEMPLATE = `<!DOCTYPE html>
                 if (tracks[i].yt === currentYtId) return i;
             }
             return -1;
+        }
+
+        // Get next track index respecting shuffle
+        function nextTrackIndex() {
+            if (shuffleOn && shuffleOrder.length > 0) {
+                var idx = currentTrackIndex();
+                var pos = shuffleOrder.indexOf(idx);
+                if (pos >= 0 && pos < shuffleOrder.length - 1) return shuffleOrder[pos + 1];
+                return -1;
+            }
+            var idx = currentTrackIndex();
+            return (idx >= 0 && idx < tracks.length - 1) ? idx + 1 : -1;
+        }
+
+        function prevTrackIndex() {
+            if (shuffleOn && shuffleOrder.length > 0) {
+                var idx = currentTrackIndex();
+                var pos = shuffleOrder.indexOf(idx);
+                if (pos > 0) return shuffleOrder[pos - 1];
+                return -1;
+            }
+            var idx = currentTrackIndex();
+            return idx > 0 ? idx - 1 : -1;
         }
 
         function updateBarUI() {
@@ -413,6 +461,8 @@ const TEMPLATE = `<!DOCTYPE html>
             // play/pause icons in bar
             document.getElementById('pb-play-icon').style.display = playing ? 'none' : 'block';
             document.getElementById('pb-pause-icon').style.display = playing ? 'block' : 'none';
+            // shuffle button
+            document.getElementById('pb-shuffle-btn').style.opacity = shuffleOn ? '1' : '0.4';
             // highlight active track
             document.querySelectorAll('.playlist-item').forEach(function(el) { el.classList.remove('active-track'); });
             t.el.classList.add('active-track');
@@ -470,21 +520,38 @@ const TEMPLATE = `<!DOCTYPE html>
         }
 
         function togglePlay() {
-            if (!ytPlayer || !currentYtId) return;
+            if (!ytPlayer) return;
+            if (!currentYtId) {
+                if (tracks.length > 0) {
+                    if (shuffleOn) {
+                        shuffleOrder = generateShuffleOrder();
+                        playTrack(tracks[shuffleOrder[0]].yt);
+                    } else {
+                        playTrack(tracks[0].yt);
+                    }
+                }
+                return;
+            }
             if (playing) ytPlayer.pauseVideo();
             else ytPlayer.playVideo();
         }
 
         function skipNext() {
-            var idx = currentTrackIndex();
-            if (idx < 0 || idx >= tracks.length - 1) return;
-            playTrack(tracks[idx + 1].yt);
+            var next = nextTrackIndex();
+            if (next >= 0) playTrack(tracks[next].yt);
         }
 
         function skipPrev() {
-            var idx = currentTrackIndex();
-            if (idx <= 0) return;
-            playTrack(tracks[idx - 1].yt);
+            var prev = prevTrackIndex();
+            if (prev >= 0) playTrack(tracks[prev].yt);
+        }
+
+        function toggleShuffle() {
+            shuffleOn = !shuffleOn;
+            if (shuffleOn) {
+                shuffleOrder = generateShuffleOrder();
+            }
+            document.getElementById('pb-shuffle-btn').style.opacity = shuffleOn ? '1' : '0.4';
         }
 
         function toggleMute() {
@@ -549,10 +616,10 @@ const TEMPLATE = `<!DOCTYPE html>
                         } else if (event.data === YT.PlayerState.ENDED) {
                             playing = false;
                             stopTimeUpdates();
-                            // Auto-advance
-                            var idx = currentTrackIndex();
-                            if (idx >= 0 && idx < tracks.length - 1) {
-                                playTrack(tracks[idx + 1].yt);
+                            // Auto-advance (respects shuffle)
+                            var next = nextTrackIndex();
+                            if (next >= 0) {
+                                playTrack(tracks[next].yt);
                             } else {
                                 currentYtId = null;
                                 updateBarUI();
