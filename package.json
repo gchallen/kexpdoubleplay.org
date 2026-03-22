@@ -11,6 +11,7 @@
     "dev": "cd worker && wrangler dev",
     "deploy": "cd worker && bun run deploy",
     "build": "bun --filter=types build",
+    "test": "bun --filter=worker test",
     "check": "cd types && bun run build && cd ../worker && npx tsc --noEmit -p tsconfig.json",
     "tail": "cd worker && wrangler tail"
   },

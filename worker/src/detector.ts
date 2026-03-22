@@ -171,7 +171,7 @@ function timeRange(dp: DoublePlay): [number, number] {
   ];
 }
 
-interface PlayEntry {
+export interface PlayEntry {
   timestamp: string;
   end_timestamp?: string;
   play_id: number;
@@ -179,7 +179,7 @@ interface PlayEntry {
   kexpPlay: KEXPPlay;
 }
 
-function classify(
+export function classify(
   plays: PlayEntry[],
 ): "legitimate" | "partial" | "mistake" {
   if (plays.length < 2) return "legitimate";
