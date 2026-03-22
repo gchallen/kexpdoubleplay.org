@@ -3,7 +3,7 @@ import type { DoublePlay, KEXPPlay } from "@kexp-doubleplay/types";
 import { handleRequest } from "./api-handler";
 import { fetchPlays, fetchShowInfo } from "./kexp-api";
 import { detectDoublePlays } from "./detector";
-import { sendDoublePlayNotification } from "./email";
+import { sendDoublePlayNotification, sendWarning } from "./notify";
 import type { ScanStateRow } from "./db";
 
 const SCAN_OVERLAP_MINUTES = 15;
@@ -28,6 +28,7 @@ export default {
 };
 
 async function runScan(env: Env, ctx: ExecutionContext): Promise<void> {
+  const scanStart = Date.now();
   console.log("Scan cron triggered");
 
   // Read scan state
@@ -192,6 +193,17 @@ async function runScan(env: Env, ctx: ExecutionContext): Promise<void> {
     // Email notifications for truly new double plays
     for (const dp of trulyNew) {
       ctx.waitUntil(sendDoublePlayNotification(env, dp));
+    }
+    // Self-monitoring: warn if scan wall time is unusually long
+    const elapsed = Date.now() - scanStart;
+    console.log(`Scan completed in ${elapsed}ms`);
+    if (elapsed > 120000) {
+      ctx.waitUntil(
+        sendWarning(
+          env,
+          `Scan took ${(elapsed / 1000).toFixed(1)}s wall time — may indicate issues with KEXP API or excessive requests`,
+        ),
+      );
     }
   } catch (err) {
     console.error(

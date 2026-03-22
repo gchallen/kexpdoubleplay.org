@@ -4,7 +4,7 @@
   "private": true,
   "scripts": {
     "dev": "wrangler dev",
-    "deploy": "cd ../types && bun run build && cd ../worker && wrangler deploy",
+    "deploy": "cd ../types && bun run build && cd ../worker && wrangler deploy && curl -s -H 'Title: Worker Deployed' -H 'Tags: rocket' -d \"kexpdoubleplays-api deployed at $(date -u '+%Y-%m-%d %H:%M UTC')\" ntfy.sh/kexpdoubleplays-f0b346e8",
     "tail": "wrangler tail"
   },
   "dependencies": {
