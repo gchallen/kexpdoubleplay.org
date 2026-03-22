@@ -1,184 +1,99 @@
 # CLAUDE.md - Project Instructions for KEXP Double Play Scanner
 
 ## Project Overview
-This is a **multi-workspace project** consisting of a backend API service and a frontend for detecting and displaying KEXP radio double plays.
+Cloudflare Worker that detects and displays KEXP radio double plays (consecutive plays of the same song). Single deployment handles frontend SSR, REST API, and scheduled scanning.
 
 ### Workspace Structure
-- **`backend/`**: TypeScript scanner service + REST API (uses Bun runtime)
-- **`frontend/`**: Express SSR server with vanilla HTML/JS templates
+- **`types/`**: Shared TypeScript types and Zod schemas
+- **`worker/`**: Cloudflare Worker — scanner, API, and frontend
 
 ## Key Technologies
-
-### Backend
-- **Runtime**: Bun (not Node.js/npm)
+- **Runtime**: Cloudflare Workers
+- **Database**: Cloudflare D1 (SQLite)
 - **Language**: TypeScript 5.x
-- **HTTP Client**: node-fetch with connection pooling
-- **Logging**: Winston with structured JSON logging
-- **Testing**: Bun's built-in test runner and Jest
-- **API**: Express.js REST server
-- **Containerization**: Docker with multi-platform support
+- **Notifications**: ntfy.sh push notifications
+- **Frontend**: Vanilla JS with YouTube IFrame API audio player (SSR from Worker)
 
-### Frontend
-- **Server**: Express.js with server-side HTML templating
-- **Language**: Vanilla JavaScript (no build step)
-- **Deployment**: Node.js server (Vercel or any hosting)
+## Architecture
 
-## Architecture Components
+### Worker Entry Points
+- **`fetch`**: HTTP handler — serves frontend at `/`, API at `/api/*`
+- **`scheduled`**: Cron trigger (every 5 minutes) — scans KEXP API for new double plays
 
-### Core Classes
-- `Scanner`: Main orchestrator, manages scanning lifecycle and API server
-- `KEXPApi`: HTTP client with exponential backoff and connection pooling  
-- `DoublePlayDetector`: Analyzes playlist data to find consecutive plays
-- `Storage`: JSON file persistence with sorted data
-- `ApiServer`: Express REST API for monitoring and data access
+### Core Modules
+- `index.ts`: Entry point, cron scan logic
+- `api-handler.ts`: REST API endpoints
+- `frontend.ts`: SSR HTML template with YouTube player, filters
+- `detector.ts`: Double play detection algorithm
+- `kexp-api.ts`: KEXP API client with retry logic
+- `notify.ts`: ntfy.sh push notifications
+- `db.ts`: D1 database utilities
+- `types.ts`: Env interface
 
-### Important Patterns
-- **Incremental Scanning**: Uses `startTime`/`endTime` timestamps for efficient scanning
-- **Cascade Failure Prevention**: Exponential backoff (5s to 5min) during API outages
-- **Graceful Degradation**: Continues running when KEXP API is down
-- **Structured Logging**: All console.log replaced with Winston structured logging
+### Key Patterns
+- **Incremental scanning**: Tracks `startTime`/`endTime` in `scan_state` table
+- **Overlap**: 15-minute overlap on each scan to catch plays spanning scan boundaries
+- **Classification**: Auto-classifies plays as `legitimate`, `partial`, or `mistake`
+- **Server-side filtering**: URL query params (`?dj=Name&show=all`) filter on the server for shareable links
 
-## Development Guidelines
+## Development
 
 ### Package Management
-- **Always use `bun install`, `bun add`, `bun dev`, `bun test`** (never npm/yarn)
-- **Pin all dependencies to exact versions**: Never use `^` or `~` version ranges in any package.json (root, types, backend, or frontend). This ensures reproducible builds across all environments.
-- Dependencies managed via bun.lockb files in each workspace
-- **Root workspace**: `bun install` manages all workspaces
-- **Individual workspaces**: `cd backend && bun install` or `cd frontend && bun install`
+- **Use `bun`** (never npm/yarn)
+- **Pin all dependencies** to exact versions (no `^` or `~`)
 
-### Code Standards
-- Replace any `console.log` with `logger.info/debug/warn/error`
-- Use structured logging with contextual metadata
-- Implement proper error handling with health status tracking
-- Follow existing TypeScript patterns and interfaces
+### Common Commands
+```bash
+bun install              # Install all workspaces
+bun run dev              # Local dev server (wrangler dev)
+bun run deploy           # Build types + deploy worker + send ntfy notification
+bun run check            # TypeScript check
+cd worker && bun run tail # Stream live logs
+```
 
 ### Configuration
+Environment variables in `worker/wrangler.toml`:
+- `NTFY_TOPIC`: ntfy.sh topic for push notifications
+- `KEXP_API_BASE_URL`: KEXP API base URL
 
-#### Backend
-Environment variables are defined in `backend/src/config.ts`:
-- `DATA_FILE_PATH`: JSON storage location (default: `./double-plays.json`)
-- `API_PORT`: REST API server port (default: `3000`)
-- `LOG_LEVEL`: Winston logging level
-- `RATE_LIMIT_DELAY`: API request throttling
-- `SCAN_INTERVAL_MINUTES`: Periodic scan frequency
+Secrets (set via `wrangler secret put`):
+- `ADMIN_TOKEN`: Bearer token for write API endpoints
 
-See `backend/BACKEND.md` for complete environment variable reference.
+### Database
+D1 database `kexpdoubleplays` with two tables:
+- `double_plays`: Detected double plays with artist, title, DJ, show, classification, youtube_id, plays JSON
+- `scan_state`: Singleton row tracking scan cursor and statistics
 
-#### Frontend
-Environment variables are set in `frontend/server.js`:
-- `PORT`: Server port (default: 8080)
-- `BACKEND_API_URL`: Hardcoded to `https://api.kexpdoubleplays.org`
-
-### Testing
-
-#### Backend
-- Unit tests use Bun's built-in test runner (`bun test`)
-- Integration tests verify real KEXP API responses
-- Known test data: Pulp "Spike Island" double play on 2025-04-10
-- GitHub backup testing: `bun test:github`, `bun test:backup`
-
-#### Frontend
-- No test framework configured
-- Manual testing via `node server.js`
-
-## Key Features to Preserve
-
-### Double Play Detection Logic
-- Handles consecutive plays separated by airbreaks
-- Supports multiple plays (double, triple, quadruple+)
-- Enriches with DJ/show information lazily (only for detected double plays)
-
-### API Health Monitoring
-- Tracks consecutive failures and recovery
-- Exponential backoff prevents cascade failures
-- Health status exposed via `/api/health` endpoint
+Migrations in `worker/migrations/`.
 
 ### REST API Endpoints
-- `/api/health`: System and scanner status
-- `/api/double-plays`: Complete dataset
-- `/api/double-plays/paginated`: Paginated access
-- `/api/stats`: Artist/DJ/show statistics
+- `GET /api/health`: System status
+- `GET /api/double-plays`: All double plays
+- `GET /api/double-plays/paginated`: Paginated access
+- `GET /api/stats`: Artist/DJ/show statistics
 
-### Logging System
-- Console: Colorized in development, JSON in production
-- Files: `logs/combined.log` and `logs/error.log`
-- Structured with service metadata and contextual information
+### Frontend Features
+- YouTube IFrame API audio player with sticky player bar
+- Per-track play/pause buttons with auto-advance
+- DJ dropdown filter and classification toggle
+- URL query params for shareable filtered views
+- Dark mode support
 
-## Common Tasks
+### Notifications (ntfy.sh)
+- **New double play**: Artist, title, DJ, show, YouTube link
+- **Deploy**: Sent after successful `bun run deploy`
+- **Scan warning**: If scan wall time exceeds 2 minutes
 
-### Backend Development
-#### Adding New Features
-1. Update TypeScript interfaces in `backend/src/types.ts` if needed
-2. Implement with proper logging using `logger` from `./logger`
-3. Add error handling with health status updates
-4. Update REST API endpoints if exposing new data
-5. Add tests using `bun test`
+## Testing
+- Known test data: Pulp "Spike Island" double play on 2025-04-10 (play IDs 3487084, 3487086)
 
-#### Debugging
-- Set `LOG_LEVEL=debug` for verbose logging
-- Check `backend/logs/combined.log` for structured JSON logs
-- Use `/api/health` endpoint to check system status
-- Monitor API health via `kexpApi` section in health response
-
-#### Deployment
-- Docker: `bun docker:build` and `bun docker:push`
-- Build: `bun build` (in backend directory)
-- Monitor via `tail -f backend/logs/combined.log`
-- Use health endpoints for uptime monitoring
-
-### Frontend Development
-#### Adding New Features
-1. Edit `frontend/template.html` for layout changes
-2. Edit `frontend/server.js` for data processing and new routes
-3. Follow KEXP design aesthetic (minimal, clean)
-4. Ensure mobile responsiveness
-
-#### Debugging
-- Run: `node frontend/server.js`
-- Browser dev tools for client-side debugging
-- Network tab to monitor API calls
-
-#### Deployment
-- Run: `node server.js` (in frontend directory)
-- Set `PORT` environment variable if needed
+## Deployment
+- **Domain**: `kexpdoubleplays.org` (DNS on Cloudflare)
+- **Deploy**: `bun run deploy` (from root or `cd worker && bun run deploy`)
+- **Cron**: `*/5 * * * *` scans KEXP API every 5 minutes
 
 ## Important Notes
-- Double plays are rare events - the JSON file won't grow large
-- KEXP API rate limiting is respected (1000ms default delay)
-- Connection pooling keeps HTTP connections alive for efficiency
-- System gracefully handles KEXP API outages without crashing
-- All timestamps are ISO 8601 UTC format
-
-## Data Recovery and Backup Loading
-
-The scanner automatically attempts to recover data from backups when starting:
-
-### Startup Data Loading Logic
-1. **Local file exists**: Uses local `double-plays.json` if available
-2. **Local file missing**: Automatically loads from backup (GitHub or local backup files)
-3. **Date range comparison**: Uses the dataset with the longer date range (more hours of coverage)
-4. **Fresh start**: Creates new data structure if no local file or backup exists
-
-### Command Line Flags
-- `--restart`: Skip backup loading and start fresh (ignores all backup data)
-- `--force-local`: Force use of local data only (ignore backups even if they have more data)
-- `--force-backup`: Force use of backup data only (ignore local file even if it exists)
-- `--progress`: Enable progress bar mode (suppresses console logging)
-- `--debug`: Enable verbose debug logging
-
-### Backup Data Sources (in priority order)
-1. **GitHub backup**: Latest commit in configured repository
-2. **Local backup files**: Most recent file in `LOCAL_BACKUP_PATH` directory
-3. **Fresh start**: New data structure with 7-day lookback window
-
-The scanner will automatically save recovered backup data to the local file for future use.
-
-## Testing Real Data
-The integration test uses actual KEXP API data. Known double play for testing:
-- Artist: Pulp
-- Song: "Spike Island"  
-- Date: April 10, 2025
-- Play IDs: 3487084, 3487086
-
-This ensures the detector works with real KEXP API responses and data structures.
+- All timestamps are ISO 8601 UTC
+- KEXP API rate limiting respected (1000ms default delay)
+- Double plays are rare — the D1 database won't grow large
+- Cloudflare Workers free plan: 10ms CPU for HTTP, 30s CPU for cron (wall time can be much longer due to I/O waits)

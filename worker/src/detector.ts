@@ -4,7 +4,6 @@ type EnrichFn = (play: KEXPPlay) => Promise<KEXPPlay>;
 
 /**
  * Detect double plays from a list of KEXP plays.
- * Ported from backend/src/detector.ts — same logic, no moment/logger dependencies.
  */
 export async function detectDoublePlays(
   plays: KEXPPlay[],

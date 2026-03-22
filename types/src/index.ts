@@ -224,7 +224,7 @@ export const PaginationQuerySchema = z.object({
   limit: z.coerce.number().min(1).max(100).default(10)
 });
 
-// Backend-specific schemas
+// Data schemas
 export const DoublePlayDataSchema = z.object({
   startTime: z.string(),
   endTime: z.string(),

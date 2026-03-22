@@ -1,84 +1,30 @@
 # KEXP Double Play Scanner
 
-A comprehensive system for detecting and displaying double plays from KEXP radio station playlist data.
+Detects and displays double plays from [KEXP](https://kexp.org) radio station playlist data. A double play is when a DJ plays the same song twice in a row.
+
+**Live at [kexpdoubleplays.org](https://kexpdoubleplays.org)**
 
 ## Architecture
 
-This project uses a **multi-workspace architecture**:
+Cloudflare Worker handling everything in a single deployment:
+- **Frontend**: Server-side rendered HTML with YouTube audio player, DJ/classification filters
+- **API**: REST endpoints for double play data and statistics
+- **Scanner**: Cron trigger (every 5 minutes) polling the KEXP API for new plays
+- **Database**: Cloudflare D1 (SQLite)
+- **Notifications**: ntfy.sh push notifications for new double plays
 
-- **`backend/`** - Node.js/TypeScript API service with scanner logic
-- **`frontend/`** - Next.js React application with KEXP-style UI
-
-## Features
-
-### Backend
-- **Real-time Scanning**: Continuous monitoring of KEXP playlist
-- **Smart Detection**: Album-aware matching prevents false positives
-- **REST API**: Comprehensive endpoints with runtime validation
-- **Health Monitoring**: Tracks API status and scanning progress
-- **Backup System**: GitHub-based data backup and recovery
-- **Docker Support**: Multi-platform containerization
-
-### Frontend  
-- **KEXP-Style Design**: Clean playlist interface with duplicate album artwork
-- **Live Updates**: Real-time double play discovery
-- **Mobile Responsive**: Beautiful design across devices
-- **Advanced Filtering**: Search by artist, DJ, show, or date
-
-## Quick Start
-
-### Backend (Scanner + API)
-```bash
-cd backend
-bun install
-bun dev
-```
-
-### Frontend (Web UI)
-```bash
-cd frontend  
-bun install
-bun dev
-```
-
-### Full Development
-```bash
-# Install all workspaces
-bun install
-
-# Run backend
-bun backend
-
-# Run frontend (separate terminal)
-bun frontend
-```
-
-## What are Double Plays?
-
-A **double play** occurs when KEXP plays the exact same track (same artist, song, and album) consecutively. The scanner analyzes KEXP's live playlist data to detect these rare events.
-
-### Classification System
-- **Legitimate**: Intentional double plays with similar durations (≤10% difference)
-- **Partial**: Track restarted due to technical issues (>10% duration difference) 
-- **Mistake**: Accidental plays (very short first play <30 seconds)
-
-## Deployment
-
-### Backend (Docker)
-```bash
-cd backend
-docker build -t geoffreychallen/kexp-doubleplay-backend:latest .
-docker run -p 3000:3000 geoffreychallen/kexp-doubleplay-backend:latest
-```
-
-### Frontend (Vercel)
-The frontend is optimized for deployment on Vercel with automatic builds.
+### Workspaces
+- `types/` — Shared TypeScript types and Zod schemas
+- `worker/` — Cloudflare Worker source
 
 ## Development
 
-See individual workspace READMEs for detailed development instructions:
-- `backend/README.md` - API service development  
-- `frontend/README.md` - React application development
+```bash
+bun install        # Install dependencies
+bun run dev        # Local dev server
+bun run deploy     # Deploy to Cloudflare
+bun run check      # TypeScript check
+```
 
 ## License
 

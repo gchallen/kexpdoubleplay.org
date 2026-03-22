@@ -1,31 +1,20 @@
 {
   "name": "kexp-doubleplay",
   "version": "2026.3.0",
-  "description": "KEXP Double Play Scanner - Multi-workspace project",
+  "description": "KEXP Double Play Scanner - Cloudflare Worker",
   "private": true,
   "workspaces": [
     "types",
-    "backend",
-    "frontend",
     "worker"
   ],
   "scripts": {
-    "backend": "bun --filter=backend dev",
-    "frontend": "bun --filter=frontend dev",
-    "build": "bun --filter=types build && bun --filter=backend build && bun --filter=frontend build",
-    "check": "cd types && bun run build && cd ../backend && bun run tsc && bun test",
-    "test": "bun --filter=backend test && bun --filter=frontend test",
-    "update-youtube": "bun run scripts/update-youtube-urls.ts"
+    "dev": "cd worker && wrangler dev",
+    "deploy": "cd worker && bun run deploy",
+    "build": "bun --filter=types build",
+    "check": "cd types && bun run build && cd ../worker && npx tsc --noEmit -p tsconfig.json",
+    "tail": "cd worker && wrangler tail"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner"],
   "author": "",
-  "license": "ISC",
-  "dependencies": {
-    "dotenv": "17.3.1",
-    "puppeteer": "24.40.0",
-    "yaml": "2.8.3"
-  },
-  "devDependencies": {
-    "@types/yaml": "1.9.7"
-  }
+  "license": "ISC"
 }
