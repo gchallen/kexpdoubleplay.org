@@ -18,15 +18,14 @@ export async function renderFrontend(
 
   // Parse filters from URL
   const url = new URL(request.url);
-  const showAll = url.searchParams.get("show") === "all";
   const djParam = url.searchParams.get("dj") || "";
   const selectedDJs = new Set(djParam ? djParam.split(",") : []);
 
-  // Count plays per DJ (respecting the show-all toggle)
+  // Count plays per DJ (excluding mistakes)
   const djCounts = new Map<string, number>();
   for (const dp of allPlays) {
     if (!dp.dj) continue;
-    if (!showAll && dp.classification === "mistake") continue;
+    if (dp.classification === "mistake") continue;
     djCounts.set(dp.dj, (djCounts.get(dp.dj) || 0) + 1);
   }
   // Only DJs with >1 double play, sorted by count desc then name
@@ -34,11 +33,8 @@ export async function renderFrontend(
     .filter(([, count]) => count > 1)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-  // Apply filters
-  let doublePlays = allPlays.filter((dp) => dp.youtube_id !== null);
-  if (!showAll) {
-    doublePlays = doublePlays.filter((dp) => dp.classification !== "mistake");
-  }
+  // Apply filters — exclude mistakes and tracks without YouTube
+  let doublePlays = allPlays.filter((dp) => dp.youtube_id && dp.classification !== "mistake");
   if (selectedDJs.size > 0) {
     doublePlays = doublePlays.filter((dp) => dp.dj && selectedDJs.has(dp.dj));
   }
@@ -55,11 +51,7 @@ export async function renderFrontend(
   const sunDisplay = isDark ? "block" : "none";
   const moonDisplay = isDark ? "none" : "block";
 
-  const ytCount = doublePlays.filter((dp) => dp.youtube_id).length;
-  const totalCount = allPlays.filter((dp) => dp.classification !== "mistake").length;
-  const mistakeCount = allPlays.filter((dp) => dp.classification === "mistake").length;
-  const filterDesc = selectedDJs.size > 0 ? ` by ${[...selectedDJs].join(", ")}` : "";
-  const statusText = `Showing ${doublePlays.length} of ${totalCount} double plays${filterDesc}${mistakeCount > 0 && showAll ? ` (includes ${mistakeCount} mistakes)` : ""}${ytCount > 0 ? ` &bull; ${ytCount} with YouTube` : ""} &bull; Last updated: <span class="timestamp" data-ts="${lastFetch || ""}"></span>`;
+  const statusText = `Last updated: <span class="timestamp" data-ts="${lastFetch || ""}"></span>`;
 
   // Build DJ checkboxes
   const djOptions = djList
@@ -76,8 +68,6 @@ export async function renderFrontend(
     .replace("{{MOON_DISPLAY}}", moonDisplay)
     .replace("{{STATUS_TEXT}}", statusText)
     .replace("{{DJ_OPTIONS}}", djOptions)
-    .replace("{{SHOW_ALL_CHECKED}}", showAll ? " checked" : "")
-    .replace("{{MISTAKE_COUNT}}", String(mistakeCount))
     .replace("{{DOUBLE_PLAYS_HTML}}", items);
 
   return new Response(html, {
@@ -139,7 +129,7 @@ const TEMPLATE = `<!DOCTYPE html>
     <title>KEXP Double Plays</title>
     <link rel="preconnect" href="https://fonts.googleapis.com">
     <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
-    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Franklin:wght@300;400;500;600&display=swap" rel="stylesheet">
+    <link href="https://fonts.googleapis.com/css2?family=Libre+Franklin:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
         :root {
             --bg: #fafaf7;
@@ -150,17 +140,18 @@ const TEMPLATE = `<!DOCTYPE html>
             --accent: #fbad18;
             --accent-dim: #fbad1830;
             --font-body: 'Libre Franklin', -apple-system, BlinkMacSystemFont, sans-serif;
-            --font-title: 'Bebas Neue', sans-serif;
+            --font-title: sans-serif;
             --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
         }
         .dark {
             --bg: #141414;
-            --text: #edede8;
-            --text-secondary: #9a9a95;
+            --text: #c8c8c3;
+            --text-title: #b0b0ab;
+            --text-secondary: #8a8a85;
             --border: #2a2825;
             --surface: #1e1d1b;
-            --accent: #fbad18;
-            --accent-dim: #fbad1825;
+            --accent: #d49515;
+            --accent-dim: #d4951520;
         }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
@@ -170,28 +161,38 @@ const TEMPLATE = `<!DOCTYPE html>
         }
         .container { max-width: 860px; margin: 0 auto; padding: 20px; }
         .header {
-            display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
+            margin-bottom: 0;
         }
-        h1 {
-            font-family: var(--font-title);
-            font-size: 2.8rem; font-weight: 400; color: var(--text);
-            text-transform: uppercase;
-            color: var(--text);
-            text-shadow: 6px 6px 0 var(--accent);
+        h1 { line-height: 1; }
+        .title-svg {
+            height: 2.8rem; width: auto;
+            transform: scaleY(-1);
         }
+        .title-main { fill: var(--text-title, var(--text)); }
+        .title-shadow { fill: var(--accent); }
+        .top-actions {
+            position: fixed; top: 16px; right: 16px; z-index: 200;
+            display: flex; align-items: center; gap: 8px;
+        }
+        .feed-btn {
+            background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 4px;
+            color: var(--text-secondary); display: flex; align-items: center; justify-content: center;
+            transition: border-color 0.2s, background-color 0.2s, color 0.2s; text-decoration: none;
+        }
+        .feed-btn:hover { background-color: var(--surface); border-color: var(--text-secondary); color: var(--accent); }
         .theme-toggle {
-            background: none; border: 1px solid var(--border); padding: 8px; border-radius: 4px;
+            background: var(--bg); border: 1px solid var(--border); padding: 8px; border-radius: 4px;
             cursor: pointer; color: inherit; transition: border-color 0.2s, background-color 0.2s;
             display: flex; align-items: center; justify-content: center;
         }
         .theme-toggle:hover { background-color: var(--surface); border-color: var(--text-secondary); }
+        .tagline { font-size: 1.3rem; color: var(--text-secondary); margin-top: 8px; margin-bottom: 16px; }
+        .tagline a { color: var(--accent); text-decoration: none; }
+        .tagline a:hover { text-decoration: underline; }
         .theme-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .status-info { margin-bottom: 12px; font-size: 1rem; color: var(--text-secondary); }
-        .filter-bar { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-        .filter-bar label { font-family: var(--font-body); font-size: 0.9rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; cursor: pointer; }
-        .filter-bar input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
-        .show-mistakes { margin-left: auto; font-size: 0.85rem; white-space: nowrap; }
+        .status-info { margin-bottom: 12px; font-size: 0.85rem; color: var(--text-secondary); text-align: right; }
+        .status-info .timestamp { font-family: var(--font-body); font-size: inherit; width: auto; }
+        .filter-bar { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
         .dj-filters { display: flex; flex-wrap: wrap; gap: 6px; }
         .dj-chip { display: flex; align-items: center; gap: 4px; font-size: 0.9rem; color: var(--text-secondary);
             padding: 2px 8px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
@@ -272,12 +273,12 @@ const TEMPLATE = `<!DOCTYPE html>
         .album-cover { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; opacity: 0; transition: opacity 0.2s; }
         .album-cover.loaded { opacity: 1; }
         .origin-story {
-            margin-top: 48px; padding: 32px 0;
+            margin-top: 24px; padding: 24px 0;
             color: var(--text-secondary); font-size: 1rem; line-height: 1.7;
         }
         .origin-story h2 {
-            font-family: var(--font-title); font-size: 1.4rem; text-transform: uppercase;
-            color: var(--text); margin-bottom: 16px;
+            font-family: var(--font-body); font-size: 1.2rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--text); margin-bottom: 16px;
         }
         .origin-story p { margin-bottom: 12px; }
         .origin-story p:last-child { margin-bottom: 0; }
@@ -285,8 +286,7 @@ const TEMPLATE = `<!DOCTYPE html>
         .origin-story a:hover { text-decoration: underline; }
         @media (max-width: 768px) {
             .container { padding: 15px; }
-            .header { flex-direction: column; gap: 15px; }
-            h1 { font-size: 2rem; }
+            h1 .title-svg { height: 2rem; }
             .item-content { flex-wrap: wrap; }
             .track-number { width: 24px; margin-right: 12px; }
             .timestamp { width: 100px; font-size: 0.7rem; }
@@ -299,12 +299,15 @@ const TEMPLATE = `<!DOCTYPE html>
             .album-cover { width: 56px; height: 56px; }
         }
     </style>
+    <link rel="alternate" type="application/rss+xml" title="KEXP Double Plays (RSS)" href="/feed.xml">
+    <link rel="alternate" type="application/atom+xml" title="KEXP Double Plays (Atom)" href="/feed.atom">
     <script src="https://www.youtube.com/iframe_api"></script>
 </head>
 <body>
     <div class="container">
-        <header class="header">
-            <h1>KEXP Double Plays</h1>
+        <div class="top-actions">
+            <a class="feed-btn" href="/feed.xml" title="RSS Feed"><svg viewBox="0 0 24 24" width="18" height="18" fill="currentColor"><path d="M6.18 15.64a2.18 2.18 0 0 1 2.18 2.18C8.36 19 7.38 20 6.18 20C5 20 4 19 4 17.82a2.18 2.18 0 0 1 2.18-2.18M4 4.44A15.56 15.56 0 0 1 19.56 20h-2.83A12.73 12.73 0 0 0 4 7.27V4.44m0 5.66a9.9 9.9 0 0 1 9.9 9.9h-2.83A7.07 7.07 0 0 0 4 12.93V10.1Z"/></svg></a>
+            <a class="feed-btn" href="/feed.atom" title="Atom Feed"><svg viewBox="0 0 24 24" width="18" height="18" fill="none" stroke="currentColor" stroke-width="2"><circle cx="12" cy="12" r="2"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(30 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(-30 12 12)"/><ellipse cx="12" cy="12" rx="10" ry="4" transform="rotate(90 12 12)"/></svg></a>
             <button class="theme-toggle" onclick="toggleTheme()" title="Toggle theme">
                 <svg class="theme-icon sun-icon" style="display:{{SUN_DISPLAY}}" viewBox="0 0 24 24">
                     <circle cx="12" cy="12" r="5"/>
@@ -314,15 +317,15 @@ const TEMPLATE = `<!DOCTYPE html>
                     <path d="M21 12.79A9 9 0 1 1 11.21 3 7 7 0 0 0 21 12.79z"/>
                 </svg>
             </button>
+        </div>
+        <header class="header">
+            <h1><svg class="title-svg" viewBox="0 0 6205 1050" aria-label="KEXP Double Plays"><g class="title-shadow" transform="translate(100,50)"><path transform="translate(0,0)" d="M41 700H151V405L291 700H401L270 443L403 0H288L195 312L151 223V0H41Z"/><path transform="translate(414,0)" d="M41 700H341V600H151V415H302V315H151V100H341V0H41Z"/><path transform="translate(777,0)" d="M138 358 17 700H133L207 474H209L285 700H389L268 358L395 0H279L199 244H197L115 0H11Z"/><path transform="translate(1183,0)" d="M41 700H203Q285 700 326.0 656.0Q367 612 367 527V458Q367 373 326.0 329.0Q285 285 203 285H151V0H41ZM203 385Q230 385 243.5 400.0Q257 415 257 451V534Q257 570 243.5 585.0Q230 600 203 600H151V385Z"/><path transform="translate(1729,0)" d="M41 700H209Q291 700 332.0 656.0Q373 612 373 527V173Q373 88 332.0 44.0Q291 0 209 0H41ZM207 100Q234 100 248.5 116.0Q263 132 263 168V532Q263 568 248.5 584.0Q234 600 207 600H151V100Z"/><path transform="translate(2135,0)" d="M33 166V534Q33 618 76.0 664.0Q119 710 200 710Q281 710 324.0 664.0Q367 618 367 534V166Q367 82 324.0 36.0Q281 -10 200 -10Q119 -10 76.0 36.0Q33 82 33 166ZM257 159V541Q257 610 200 610Q143 610 143 541V159Q143 90 200 90Q257 90 257 159Z"/><path transform="translate(2535,0)" d="M37 166V700H147V158Q147 122 161.5 106.0Q176 90 203 90Q230 90 244.5 106.0Q259 122 259 158V700H365V166Q365 81 323.0 35.5Q281 -10 201 -10Q121 -10 79.0 35.5Q37 81 37 166Z"/><path transform="translate(2937,0)" d="M41 700H207Q292 700 331.0 660.5Q370 621 370 539V511Q370 457 352.5 423.0Q335 389 299 374V372Q381 344 381 226V166Q381 85 338.5 42.5Q296 0 214 0H41ZM194 415Q227 415 243.5 432.0Q260 449 260 489V528Q260 566 246.5 583.0Q233 600 204 600H151V415ZM214 100Q243 100 257.0 115.5Q271 131 271 169V230Q271 278 254.5 296.5Q238 315 200 315H151V100Z"/><path transform="translate(3341,0)" d="M41 700H151V100H332V0H41Z"/><path transform="translate(3685,0)" d="M41 700H341V600H151V415H302V315H151V100H341V0H41Z"/><path transform="translate(4208,0)" d="M41 700H203Q285 700 326.0 656.0Q367 612 367 527V458Q367 373 326.0 329.0Q285 285 203 285H151V0H41ZM203 385Q230 385 243.5 400.0Q257 415 257 451V534Q257 570 243.5 585.0Q230 600 203 600H151V385Z"/><path transform="translate(4594,0)" d="M41 700H151V100H332V0H41Z"/><path transform="translate(4938,0)" d="M126 700H275L389 0H279L259 139V137H134L114 0H12ZM246 232 197 578H195L147 232Z"/><path transform="translate(5339,0)" d="M142 298 9 700H126L201 443H203L278 700H385L252 298V0H142Z"/><path transform="translate(5733,0)" d="M22 166V206H126V158Q126 90 183 90Q211 90 225.5 106.5Q240 123 240 160Q240 204 220.0 237.5Q200 271 146 318Q78 378 51.0 426.5Q24 475 24 536Q24 619 66.0 664.5Q108 710 188 710Q267 710 307.5 664.5Q348 619 348 534V505H244V541Q244 577 230.0 593.5Q216 610 189 610Q134 610 134 543Q134 505 154.5 472.0Q175 439 229 392Q298 332 324.0 283.0Q350 234 350 168Q350 82 307.5 36.0Q265 -10 184 -10Q104 -10 63.0 35.5Q22 81 22 166Z"/></g><g class="title-main" transform="translate(0,0)"><path transform="translate(0,0)" d="M41 700H151V405L291 700H401L270 443L403 0H288L195 312L151 223V0H41Z"/><path transform="translate(414,0)" d="M41 700H341V600H151V415H302V315H151V100H341V0H41Z"/><path transform="translate(777,0)" d="M138 358 17 700H133L207 474H209L285 700H389L268 358L395 0H279L199 244H197L115 0H11Z"/><path transform="translate(1183,0)" d="M41 700H203Q285 700 326.0 656.0Q367 612 367 527V458Q367 373 326.0 329.0Q285 285 203 285H151V0H41ZM203 385Q230 385 243.5 400.0Q257 415 257 451V534Q257 570 243.5 585.0Q230 600 203 600H151V385Z"/><path transform="translate(1729,0)" d="M41 700H209Q291 700 332.0 656.0Q373 612 373 527V173Q373 88 332.0 44.0Q291 0 209 0H41ZM207 100Q234 100 248.5 116.0Q263 132 263 168V532Q263 568 248.5 584.0Q234 600 207 600H151V100Z"/><path transform="translate(2135,0)" d="M33 166V534Q33 618 76.0 664.0Q119 710 200 710Q281 710 324.0 664.0Q367 618 367 534V166Q367 82 324.0 36.0Q281 -10 200 -10Q119 -10 76.0 36.0Q33 82 33 166ZM257 159V541Q257 610 200 610Q143 610 143 541V159Q143 90 200 90Q257 90 257 159Z"/><path transform="translate(2535,0)" d="M37 166V700H147V158Q147 122 161.5 106.0Q176 90 203 90Q230 90 244.5 106.0Q259 122 259 158V700H365V166Q365 81 323.0 35.5Q281 -10 201 -10Q121 -10 79.0 35.5Q37 81 37 166Z"/><path transform="translate(2937,0)" d="M41 700H207Q292 700 331.0 660.5Q370 621 370 539V511Q370 457 352.5 423.0Q335 389 299 374V372Q381 344 381 226V166Q381 85 338.5 42.5Q296 0 214 0H41ZM194 415Q227 415 243.5 432.0Q260 449 260 489V528Q260 566 246.5 583.0Q233 600 204 600H151V415ZM214 100Q243 100 257.0 115.5Q271 131 271 169V230Q271 278 254.5 296.5Q238 315 200 315H151V100Z"/><path transform="translate(3341,0)" d="M41 700H151V100H332V0H41Z"/><path transform="translate(3685,0)" d="M41 700H341V600H151V415H302V315H151V100H341V0H41Z"/><path transform="translate(4208,0)" d="M41 700H203Q285 700 326.0 656.0Q367 612 367 527V458Q367 373 326.0 329.0Q285 285 203 285H151V0H41ZM203 385Q230 385 243.5 400.0Q257 415 257 451V534Q257 570 243.5 585.0Q230 600 203 600H151V385Z"/><path transform="translate(4594,0)" d="M41 700H151V100H332V0H41Z"/><path transform="translate(4938,0)" d="M126 700H275L389 0H279L259 139V137H134L114 0H12ZM246 232 197 578H195L147 232Z"/><path transform="translate(5339,0)" d="M142 298 9 700H126L201 443H203L278 700H385L252 298V0H142Z"/><path transform="translate(5733,0)" d="M22 166V206H126V158Q126 90 183 90Q211 90 225.5 106.5Q240 123 240 160Q240 204 220.0 237.5Q200 271 146 318Q78 378 51.0 426.5Q24 475 24 536Q24 619 66.0 664.5Q108 710 188 710Q267 710 307.5 664.5Q348 619 348 534V505H244V541Q244 577 230.0 593.5Q216 610 189 610Q134 610 134 543Q134 505 154.5 472.0Q175 439 229 392Q298 332 324.0 283.0Q350 234 350 168Q350 82 307.5 36.0Q265 -10 184 -10Q104 -10 63.0 35.5Q22 81 22 166Z"/></g></svg></h1>
+            <p class="tagline">Sometimes when <a href="https://www.kexp.org" target="_blank">KEXP</a> DJ <a href="https://www.kexp.org/djs/john-richards/" target="_blank">John</a> loves a new song, he plays it twice. <a href="#origin">Read more&hellip;</a></p>
         </header>
-        <div class="status-info">{{STATUS_TEXT}}</div>
         <div class="filter-bar">
             <div class="dj-filters">{{DJ_OPTIONS}}</div>
-            <label class="show-mistakes" title="Include {{MISTAKE_COUNT}} entries that may be data errors">
-                <input type="checkbox" id="show-all" onchange="applyFilters()"{{SHOW_ALL_CHECKED}}>
-                Show mistakes
-            </label>
         </div>
+        <div class="status-info">{{STATUS_TEXT}}</div>
         <div id="player-bar" class="player-bar">
             <div class="pb-controls">
                 <button onclick="skipPrev()" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
@@ -347,12 +350,12 @@ const TEMPLATE = `<!DOCTYPE html>
         </div>
         <div id="yt-container" style="position:fixed;width:1px;height:1px;overflow:hidden;visibility:hidden;left:-9999px"><div id="yt-player"></div></div>
         <div class="playlist">{{DOUBLE_PLAYS_HTML}}</div>
-        <footer class="origin-story">
+        <footer class="origin-story" id="origin">
             <h2>Origin Story</h2>
-            <p>I created this site because I noticed that sometimes when <a href="https://www.kexp.org/djs/john-richards/">John Richards</a> really likes a new song, he plays it twice in a row&mdash;just like a human would, on <a href="https://www.kexp.org">human-powered radio</a>. After catching him do this a few times, I started wondering if you could use the KEXP API to detect double plays automatically.</p>
-            <p>This was the first project I built with an AI coding agent. I initially used Cursor to create a TypeScript wrapper around the KEXP API, then later returned to it with <a href="https://claude.ai/claude-code">Claude Code</a>. I deployed the first double play monitor backend in late 2025 but didn't get around to building a frontend until recently.</p>
-            <p>The KEXP API only provides about one year of historical data, which means it doesn't include a few of my favorite double plays: <a href="https://www.youtube.com/watch?v=oiRWtw4YmaI">"No Liver, No Lungs"</a> by <a href="https://www.brimheim.com">Brimheim</a> and <a href="https://www.youtube.com/watch?v=vvPCm8cD6kw">"Bend"</a> by <a href="https://www.middlekidsmusic.com">Middle Kids</a>. Perhaps one day the API will go back further and we can hunt for more double plays.</p>
-            <p>Consider this a belated birthday gift to John Richards. Feel free to <a href="https://geoffreychallen.com">get in touch</a> if there are remote development opportunities at KEXP.</p>
+            <p>I created this site because I noticed that sometimes when <a href="https://www.kexp.org/djs/john-richards/" target="_blank">John Richards</a> really likes a new song, he plays it twice in a row&mdash;just like a human would, on <a href="https://www.kexp.org" target="_blank">human-powered radio</a>. After catching him do this a few times, I started wondering if you could use the <a href="https://api.kexp.org/v2/" target="_blank">KEXP API</a> to detect double plays automatically.</p>
+            <p>This was the first project I built with an AI coding agent. I initially used Cursor to create a TypeScript wrapper around the <a href="https://api.kexp.org/v2/" target="_blank">KEXP API</a>, then later returned to it with <a href="https://claude.ai/claude-code" target="_blank">Claude Code</a>. I deployed the first double play monitor backend in late 2025 but didn't get around to building a frontend until recently.</p>
+            <p>The <a href="https://api.kexp.org/v2/" target="_blank">KEXP API</a> only provides about one year of historical data, which means it doesn't include a few of my favorite double plays: <a href="https://www.youtube.com/watch?v=oiRWtw4YmaI" target="_blank">"No Liver, No Lungs"</a> by <a href="https://www.brimheim.com" target="_blank">Brimheim</a> and <a href="https://www.youtube.com/watch?v=vvPCm8cD6kw" target="_blank">"Bend"</a> by <a href="https://www.middlekidsmusic.com" target="_blank">Middle Kids</a>. Perhaps one day the API will go back further and we can hunt for more double plays.</p>
+            <p>Consider this a belated birthday gift to John Richards. Feel free to <a href="https://geoffreychallen.com" target="_blank">get in touch</a> if there are remote development opportunities at KEXP.</p>
         </footer>
     </div>
     <script>
@@ -383,11 +386,9 @@ const TEMPLATE = `<!DOCTYPE html>
         /* ── Filters ── */
         function applyFilters() {
             var params = new URLSearchParams();
-            var showAll = document.getElementById('show-all').checked;
             var djs = [];
             document.querySelectorAll('.dj-cb:checked').forEach(function(cb) { djs.push(cb.value); });
             if (djs.length > 0) params.set('dj', djs.join(','));
-            if (showAll) params.set('show', 'all');
             var qs = params.toString();
             window.location.href = window.location.pathname + (qs ? '?' + qs : '');
         }

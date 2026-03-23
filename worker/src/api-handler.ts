@@ -36,6 +36,12 @@ export async function handleRequest(
     switch (path) {
       case "/":
         return await renderFrontend(request, env);
+      case "/feed.xml":
+      case "/rss":
+        return await handleFeed(url, env, "rss");
+      case "/feed.atom":
+      case "/atom":
+        return await handleFeed(url, env, "atom");
       case "/api/health":
         return await handleHealth(env);
       case "/api/double-plays":
@@ -502,6 +508,78 @@ function handleApiInfo(): Response {
     timestamp: new Date().toISOString(),
   };
   return json(response);
+}
+
+function escXml(s: string): string {
+  return s.replace(/&/g, "&amp;").replace(/</g, "&lt;").replace(/>/g, "&gt;").replace(/"/g, "&quot;");
+}
+
+async function handleFeed(url: URL, env: Env, format: "rss" | "atom"): Promise<Response> {
+  const { results: rows } = await env.DB.prepare(
+    "SELECT * FROM double_plays WHERE youtube_id IS NOT NULL ORDER BY first_play_timestamp DESC LIMIT 50",
+  ).all<DoublePlayRow>();
+
+  const plays = rows.map(rowToDoublePlay);
+  const siteUrl = `${url.protocol}//${url.host}`;
+  const now = new Date().toISOString();
+
+  if (format === "atom") {
+    const entries = plays.map((dp) => {
+      const ts = dp.plays[0].timestamp;
+      const ytUrl = dp.youtube_id ? `https://www.youtube.com/watch?v=${dp.youtube_id}` : "";
+      return `  <entry>
+    <title>${escXml(dp.title)} by ${escXml(dp.artist)}</title>
+    <link href="${ytUrl}" rel="alternate"/>
+    <id>${siteUrl}/double-play/${dp.plays[0].kexpPlay.play_id}</id>
+    <updated>${ts}</updated>
+    <summary>${escXml(dp.dj || "Unknown DJ")} played "${escXml(dp.title)}" by ${escXml(dp.artist)} twice on ${escXml(dp.show || "KEXP")}.</summary>
+  </entry>`;
+    }).join("\n");
+
+    const atom = `<?xml version="1.0" encoding="utf-8"?>
+<feed xmlns="http://www.w3.org/2005/Atom">
+  <title>KEXP Double Plays</title>
+  <subtitle>Sometimes when a KEXP DJ loves a new song, they play it twice.</subtitle>
+  <link href="${siteUrl}/feed.atom" rel="self" type="application/atom+xml"/>
+  <link href="${siteUrl}/" rel="alternate" type="text/html"/>
+  <id>${siteUrl}/</id>
+  <updated>${plays.length > 0 ? plays[0].plays[0].timestamp : now}</updated>
+${entries}
+</feed>`;
+
+    return new Response(atom, {
+      headers: { "Content-Type": "application/atom+xml; charset=utf-8", ...CORS },
+    });
+  }
+
+  // RSS 2.0
+  const items = plays.map((dp) => {
+    const ts = new Date(dp.plays[0].timestamp).toUTCString();
+    const ytUrl = dp.youtube_id ? `https://www.youtube.com/watch?v=${dp.youtube_id}` : siteUrl;
+    return `    <item>
+      <title>${escXml(dp.title)} by ${escXml(dp.artist)}</title>
+      <link>${ytUrl}</link>
+      <guid isPermaLink="false">${siteUrl}/double-play/${dp.plays[0].kexpPlay.play_id}</guid>
+      <pubDate>${ts}</pubDate>
+      <description>${escXml(dp.dj || "Unknown DJ")} played "${escXml(dp.title)}" by ${escXml(dp.artist)} twice on ${escXml(dp.show || "KEXP")}.</description>
+    </item>`;
+  }).join("\n");
+
+  const rss = `<?xml version="1.0" encoding="utf-8"?>
+<rss version="2.0" xmlns:atom="http://www.w3.org/2005/Atom">
+  <channel>
+    <title>KEXP Double Plays</title>
+    <link>${siteUrl}/</link>
+    <description>Sometimes when a KEXP DJ loves a new song, they play it twice.</description>
+    <atom:link href="${siteUrl}/feed.xml" rel="self" type="application/rss+xml"/>
+    <lastBuildDate>${plays.length > 0 ? new Date(plays[0].plays[0].timestamp).toUTCString() : new Date().toUTCString()}</lastBuildDate>
+${items}
+  </channel>
+</rss>`;
+
+  return new Response(rss, {
+    headers: { "Content-Type": "application/rss+xml; charset=utf-8", ...CORS },
+  });
 }
 
 function json(data: unknown, status = 200): Response {
