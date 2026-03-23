@@ -33,8 +33,9 @@ export async function renderFrontend(
     .filter(([, count]) => count > 1)
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
-  // Apply filters — exclude mistakes and tracks without YouTube
-  let doublePlays = allPlays.filter((dp) => dp.youtube_id && dp.classification !== "mistake");
+  // Apply filters — exclude mistakes and unmapped tracks (youtube_id === "")
+  // New tracks (youtube_id undefined/null) are shown; mapped tracks are shown; unmapped ("") are hidden
+  let doublePlays = allPlays.filter((dp) => dp.youtube_id !== "" && dp.classification !== "mistake");
   if (selectedDJs.size > 0) {
     doublePlays = doublePlays.filter((dp) => dp.dj && selectedDJs.has(dp.dj));
   }
@@ -63,11 +64,18 @@ export async function renderFrontend(
 
   const items = doublePlays.map((dp, i) => renderItem(dp, doublePlays.length - i)).join("");
 
+  // Build YouTube playlist URL from mapped tracks (limit 50)
+  const ytIds = doublePlays.filter((dp) => dp.youtube_id).slice(0, 50).map((dp) => dp.youtube_id);
+  const ytPlaylistUrl = ytIds.length > 0
+    ? `https://www.youtube.com/watch_videos?video_ids=${ytIds.join(",")}`
+    : "";
+
   const html = TEMPLATE.replace("{{THEME_CLASS}}", themeClass)
     .replace("{{SUN_DISPLAY}}", sunDisplay)
     .replace("{{MOON_DISPLAY}}", moonDisplay)
     .replace("{{STATUS_TEXT}}", statusText)
     .replace("{{DJ_OPTIONS}}", djOptions)
+    .replace("{{YT_PLAYLIST_URL}}", ytPlaylistUrl)
     .replace("{{DOUBLE_PLAYS_HTML}}", items);
 
   return new Response(html, {
@@ -104,14 +112,16 @@ function renderItem(dp: DoublePlay, i: number): string {
   const ytAttr = dp.youtube_id ? ` data-yt="${dp.youtube_id}"` : "";
   const djShow = [dp.dj, dp.show].filter(Boolean).join(" \u2022 ");
   const album = first.kexpPlay.album || "";
+  const newClass = dp.youtube_id ? "" : " new-track";
+  const newBadge = dp.youtube_id ? "" : `<span class="new-badge">New</span>`;
 
-  return `<div class="playlist-item"${ytAttr} data-title="${escAttr(dp.title)}" data-artist="${escAttr(dp.artist)}" data-album="${escAttr(album)}" data-dj-show="${escAttr(djShow)}">
+  return `<div class="playlist-item${newClass}"${ytAttr} data-title="${escAttr(dp.title)}" data-artist="${escAttr(dp.artist)}" data-album="${escAttr(album)}" data-dj-show="${escAttr(djShow)}">
   <div class="item-content">
     <div class="track-number">${i}</div>
     ${playBtn}
     <div class="timestamp" data-ts="${first.timestamp}"></div>
     <div class="track-info">
-      <div class="track-title">${dp.title}</div>
+      <div class="track-title">${dp.title}${newBadge}</div>
       <div class="artist-name">${dp.artist}${first.kexpPlay.album ? ` &mdash; ${first.kexpPlay.album}` : ""}</div>
       <div class="show-dj-line">
         ${dp.dj ? `<span class="dj-name">${dp.dj}</span>` : ""}
@@ -204,6 +214,13 @@ const TEMPLATE = `<!DOCTYPE html>
         .dj-chip:hover { background: var(--surface); }
         .dj-chip:has(input:checked) { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
         .dj-chip input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
+        .yt-playlist-btn {
+            display: inline-flex; align-items: center; gap: 6px; font-family: var(--font-body);
+            font-size: 0.85rem; color: var(--text-secondary); text-decoration: none;
+            padding: 4px 10px; border: 1px solid var(--border); border-radius: 12px;
+            transition: background-color 0.15s, border-color 0.15s, color 0.15s; white-space: nowrap;
+        }
+        .yt-playlist-btn:hover { background: var(--surface); border-color: var(--text-secondary); color: var(--text); }
         .playlist-item {
             padding: 20px; border-bottom: 1px solid var(--border);
             transition: background-color 0.2s; border-left: 3px solid transparent;
@@ -258,6 +275,12 @@ const TEMPLATE = `<!DOCTYPE html>
         .player-bar .pb-volume input[type="range"] { width: 60px; }
         .playlist-item.active-track { border-left-color: var(--accent); background-color: transparent; }
         .playlist-item.active-track:hover { background-color: var(--surface); }
+        .playlist-item.new-track { opacity: 0.65; }
+        .new-badge {
+            display: inline-block; font-size: 0.65rem; font-weight: 600; text-transform: uppercase;
+            letter-spacing: 0.05em; color: var(--accent); background: var(--accent-dim);
+            padding: 1px 6px; border-radius: 3px; margin-left: 8px; vertical-align: middle;
+        }
         @media (max-width: 768px) {
             .player-bar { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
             .player-bar .pb-thumb { width: 48px; height: 27px; }
@@ -328,6 +351,7 @@ const TEMPLATE = `<!DOCTYPE html>
         </header>
         <div class="filter-bar">
             <div class="dj-filters">{{DJ_OPTIONS}}</div>
+            <a class="yt-playlist-btn" href="{{YT_PLAYLIST_URL}}" target="_blank" title="Open playlist in YouTube"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.58 7.19c-.23-.86-.91-1.54-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42c-.86.23-1.54.91-1.77 1.77C2 8.75 2 12 2 12s0 3.25.42 4.81c.23.86.91 1.54 1.77 1.77C5.75 19 12 19 12 19s6.25 0 7.81-.42c.86-.23 1.54-.91 1.77-1.77C22 15.25 22 12 22 12s0-3.25-.42-4.81zM10 15V9l5.2 3-5.2 3z"/></svg> Open in YouTube</a>
         </div>
         <div class="status-info">{{STATUS_TEXT}}</div>
         <div id="player-bar" class="player-bar">
@@ -359,6 +383,7 @@ const TEMPLATE = `<!DOCTYPE html>
             <p>I created this site because I noticed that sometimes when <a href="https://www.kexp.org" target="_blank">KEXP</a> DJ <a href="https://www.kexp.org/djs/john-richards/" target="_blank">John Richards</a> really likes a new song, he plays it twice in a row&mdash;just like a human would, on human-powered radio. After catching him do this a few times, I started wondering if you could use the <a href="https://api.kexp.org/v2/" target="_blank">KEXP API</a> to detect double plays automatically.</p>
             <p>This was the first project I built with an AI coding agent. I initially used Cursor to create a TypeScript wrapper around the <a href="https://api.kexp.org/v2/" target="_blank">KEXP API</a>, then later returned to it with <a href="https://claude.ai/claude-code" target="_blank">Claude Code</a>. I deployed the first double play monitor backend in late 2025 but didn't get around to building a frontend until recently.</p>
             <p>The <a href="https://api.kexp.org/v2/" target="_blank">KEXP API</a> only provides about one year of historical data, which means it doesn't include a few of my favorite double plays: <a href="https://www.youtube.com/watch?v=oiRWtw4YmaI" target="_blank">"No Liver, No Lungs"</a> by <a href="https://www.brimheim.com" target="_blank">Brimheim</a> and <a href="https://www.youtube.com/watch?v=vvPCm8cD6kw" target="_blank">"Bend"</a> by <a href="https://www.middlekidsmusic.com" target="_blank">Middle Kids</a>. Perhaps one day the API will go back further and we can hunt for more double plays.</p>
+            <p>Due to the limitations of existing music service APIs, curation of this playlist is a manual process. If you see a double play above that doesn't have a track yet, please be patient. I'll get to it soon.</p>
             <p>Consider this a belated birthday gift to John Richards. Feel free to <a href="https://geoffreychallen.com" target="_blank">get in touch</a> if there are remote development opportunities at KEXP.</p>
         </footer>
     </div>

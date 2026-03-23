@@ -326,7 +326,9 @@ async function handleSetYouTube(
   const body = (await request.json()) as {
     youtube_id?: string | null;
   };
-  const youtubeId = body.youtube_id?.trim() || null;
+  const youtubeId = body.youtube_id === undefined || body.youtube_id === null
+    ? null
+    : body.youtube_id.trim();
 
   const result = await env.DB.prepare(
     "UPDATE double_plays SET youtube_id = ?, updated_at = datetime('now') WHERE id = ?",
