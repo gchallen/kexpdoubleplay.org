@@ -35,7 +35,7 @@ export async function renderFrontend(
     .sort((a, b) => b[1] - a[1] || a[0].localeCompare(b[0]));
 
   // Apply filters
-  let doublePlays = allPlays;
+  let doublePlays = allPlays.filter((dp) => dp.youtube_id !== null);
   if (!showAll) {
     doublePlays = doublePlays.filter((dp) => dp.classification !== "mistake");
   }
@@ -69,7 +69,7 @@ export async function renderFrontend(
     })
     .join("");
 
-  const items = doublePlays.map((dp, i) => renderItem(dp, i)).join("");
+  const items = doublePlays.map((dp, i) => renderItem(dp, doublePlays.length - i)).join("");
 
   const html = TEMPLATE.replace("{{THEME_CLASS}}", themeClass)
     .replace("{{SUN_DISPLAY}}", sunDisplay)
@@ -110,18 +110,16 @@ function renderItem(dp: DoublePlay, i: number): string {
 
   const ytAttr = dp.youtube_id ? ` data-yt="${dp.youtube_id}"` : "";
   const djShow = [dp.dj, dp.show].filter(Boolean).join(" \u2022 ");
+  const album = first.kexpPlay.album || "";
 
-  return `<div class="playlist-item"${ytAttr} data-title="${escAttr(dp.title)}" data-artist="${escAttr(dp.artist)}" data-dj-show="${escAttr(djShow)}">
+  return `<div class="playlist-item"${ytAttr} data-title="${escAttr(dp.title)}" data-artist="${escAttr(dp.artist)}" data-album="${escAttr(album)}" data-dj-show="${escAttr(djShow)}">
   <div class="item-content">
-    <div class="track-number">${i + 1}</div>
+    <div class="track-number">${i}</div>
     ${playBtn}
     <div class="timestamp" data-ts="${first.timestamp}"></div>
     <div class="track-info">
-      <div class="track-line">
-        <span class="track-title">${dp.title}</span>
-        <span class="artist-name">by ${dp.artist}</span>
-        ${first.kexpPlay.album ? `<span class="release-year">(${first.kexpPlay.album})</span>` : ""}
-      </div>
+      <div class="track-title">${dp.title}</div>
+      <div class="artist-name">${dp.artist}${first.kexpPlay.album ? ` &mdash; ${first.kexpPlay.album}` : ""}</div>
       <div class="show-dj-line">
         ${dp.dj ? `<span class="dj-name">${dp.dj}</span>` : ""}
         ${dp.dj && dp.show ? `<span class="separator"> &bull; </span>` : ""}
@@ -139,75 +137,94 @@ const TEMPLATE = `<!DOCTYPE html>
     <meta charset="UTF-8">
     <meta name="viewport" content="width=device-width, initial-scale=1.0">
     <title>KEXP Double Plays</title>
+    <link rel="preconnect" href="https://fonts.googleapis.com">
+    <link rel="preconnect" href="https://fonts.gstatic.com" crossorigin>
+    <link href="https://fonts.googleapis.com/css2?family=Bebas+Neue&family=Libre+Franklin:wght@300;400;500;600&display=swap" rel="stylesheet">
     <style>
+        :root {
+            --bg: #fafaf7;
+            --text: #1a1a1a;
+            --text-secondary: #6b6b6b;
+            --border: #e8e5e0;
+            --surface: #f3f1ec;
+            --accent: #fbad18;
+            --accent-dim: #fbad1830;
+            --font-body: 'Libre Franklin', -apple-system, BlinkMacSystemFont, sans-serif;
+            --font-title: 'Bebas Neue', sans-serif;
+            --font-mono: 'JetBrains Mono', 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace;
+        }
+        .dark {
+            --bg: #141414;
+            --text: #edede8;
+            --text-secondary: #9a9a95;
+            --border: #2a2825;
+            --surface: #1e1d1b;
+            --accent: #fbad18;
+            --accent-dim: #fbad1825;
+        }
         * { margin: 0; padding: 0; box-sizing: border-box; }
         body {
-            font-family: -apple-system, BlinkMacSystemFont, 'Segoe UI', Roboto, Oxygen, Ubuntu, Cantarell, sans-serif;
-            line-height: 1.6; background-color: white; color: black;
+            font-family: var(--font-body);
+            line-height: 1.6; background-color: var(--bg); color: var(--text);
             transition: background-color 0.2s, color 0.2s;
         }
-        .dark body { background-color: #111; color: white; }
-        .container { max-width: 1200px; margin: 0 auto; padding: 20px; }
+        .container { max-width: 860px; margin: 0 auto; padding: 20px; }
         .header {
             display: flex; justify-content: space-between; align-items: center;
-            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid #e5e5e5;
+            margin-bottom: 30px; padding-bottom: 20px; border-bottom: 1px solid var(--border);
         }
-        .dark .header { border-bottom-color: #333; }
-        h1 { font-size: 2.5rem; font-weight: 300; color: black; }
-        .dark h1 { color: white; }
+        h1 {
+            font-family: var(--font-title);
+            font-size: 2.8rem; font-weight: 400; color: var(--text);
+            text-transform: uppercase;
+            color: var(--text);
+            text-shadow: 6px 6px 0 var(--accent);
+        }
         .theme-toggle {
-            background: none; border: 1px solid #ddd; padding: 8px; border-radius: 4px;
+            background: none; border: 1px solid var(--border); padding: 8px; border-radius: 4px;
             cursor: pointer; color: inherit; transition: border-color 0.2s, background-color 0.2s;
             display: flex; align-items: center; justify-content: center;
         }
-        .theme-toggle:hover { background-color: #f5f5f5; border-color: #ccc; }
-        .dark .theme-toggle { border-color: #555; }
-        .dark .theme-toggle:hover { background-color: #222; border-color: #666; }
+        .theme-toggle:hover { background-color: var(--surface); border-color: var(--text-secondary); }
         .theme-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .status-info { margin-bottom: 12px; font-size: 0.9rem; color: #666; }
-        .dark .status-info { color: #aaa; }
-        .filter-bar { display: flex; align-items: center; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
-        .filter-bar label { font-size: 0.85rem; color: #555; display: flex; align-items: center; gap: 6px; cursor: pointer; }
-        .dark .filter-bar label { color: #bbb; }
-        .filter-bar input[type="checkbox"] { cursor: pointer; }
+        .status-info { margin-bottom: 12px; font-size: 1rem; color: var(--text-secondary); }
+        .filter-bar { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 20px; flex-wrap: wrap; }
+        .filter-bar label { font-family: var(--font-body); font-size: 0.9rem; color: var(--text-secondary); display: flex; align-items: center; gap: 6px; cursor: pointer; }
+        .filter-bar input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
+        .show-mistakes { margin-left: auto; font-size: 0.85rem; white-space: nowrap; }
         .dj-filters { display: flex; flex-wrap: wrap; gap: 6px; }
-        .dj-chip { display: flex; align-items: center; gap: 4px; font-size: 0.8rem; color: #555;
-            padding: 2px 8px; border: 1px solid #ddd; border-radius: 12px; cursor: pointer;
+        .dj-chip { display: flex; align-items: center; gap: 4px; font-size: 0.9rem; color: var(--text-secondary);
+            padding: 2px 8px; border: 1px solid var(--border); border-radius: 12px; cursor: pointer;
             transition: background-color 0.15s, border-color 0.15s; }
-        .dj-chip:hover { background: #f0f0f0; }
-        .dj-chip:has(input:checked) { background: #e8f0fe; border-color: #4285f4; color: #1a56db; }
-        .dark .dj-chip { color: #bbb; border-color: #444; }
-        .dark .dj-chip:hover { background: #2a2a2a; }
-        .dark .dj-chip:has(input:checked) { background: #1a2744; border-color: #4285f4; color: #8ab4f8; }
-        .dj-chip input[type="checkbox"] { cursor: pointer; }
-        .playlist-item { padding: 20px; border-bottom: 1px solid #f0f0f0; transition: background-color 0.2s; }
-        .playlist-item:hover { background-color: #fafafa; }
-        .dark .playlist-item { border-bottom-color: #222; }
-        .dark .playlist-item:hover { background-color: #1a1a1a; }
+        .dj-chip:hover { background: var(--surface); }
+        .dj-chip:has(input:checked) { background: var(--accent-dim); border-color: var(--accent); color: var(--text); }
+        .dj-chip input[type="checkbox"] { cursor: pointer; accent-color: var(--accent); }
+        .playlist-item {
+            padding: 20px; border-bottom: 1px solid var(--border);
+            transition: background-color 0.2s; border-left: 3px solid transparent;
+        }
+        .playlist-item:hover { background-color: var(--surface); }
         .item-content { display: flex; align-items: center; width: 100%; }
-        .track-number { flex-shrink: 0; margin-right: 16px; width: 32px; text-align: right; font-family: 'SF Mono', Monaco, 'Cascadia Code', 'Roboto Mono', monospace; font-size: 0.875rem; color: #666; }
-        .dark .track-number { color: #aaa; }
+        .track-number { flex-shrink: 0; margin-right: 16px; width: 32px; text-align: right; font-family: var(--font-mono); font-size: 1rem; color: var(--text-secondary); }
         .play-button { flex-shrink: 0; margin-right: 12px; width: 32px; height: 32px; }
         .play-button button { display: block; background: none; border: none; padding: 0; cursor: pointer; transition: opacity 0.2s; }
         .play-button button:hover { opacity: 0.8; }
         .play-button.invisible { visibility: hidden; }
         .play-button svg { width: 32px; height: 32px; }
-        .play-button .fill-black { fill: black; }
-        .dark .play-button .fill-black { fill: white; }
+        .play-button .fill-black { fill: var(--text); }
 
         /* Player bar */
         .player-bar {
             position: sticky; top: 0; z-index: 100;
-            background: #f8f8f8; border-bottom: 1px solid #e0e0e0;
+            background: var(--surface); border-top: 2px solid var(--accent);
+            border-bottom: 1px solid var(--border);
             padding: 8px 20px; display: flex; align-items: center; gap: 12px;
+            min-height: 54px;
         }
-        .dark .player-bar { background: #1a1a1a; border-bottom-color: #333; }
-        .player-bar .pb-thumb { width: 60px; height: 34px; object-fit: cover; border-radius: 3px; flex-shrink: 0; background: #ddd; }
-        .dark .player-bar .pb-thumb { background: #333; }
-        .player-bar .pb-info { flex: 1; min-width: 0; overflow: hidden; }
-        .player-bar .pb-title { font-size: 0.85rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .player-bar .pb-artist { font-size: 0.75rem; color: #666; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
-        .dark .player-bar .pb-artist { color: #aaa; }
+        .player-bar .pb-thumb { width: 60px; height: 34px; min-width: 60px; min-height: 34px; border-radius: 3px; flex-shrink: 0; background-size: cover; background-position: center; }
+        .player-bar .pb-info { flex: 1; min-width: 0; overflow: hidden; display: flex; flex-direction: column; justify-content: center; }
+        .player-bar .pb-title { font-family: var(--font-body); font-size: 0.95rem; font-weight: 500; white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
+        .player-bar .pb-artist { font-family: var(--font-body); font-size: 0.85rem; color: var(--text-secondary); white-space: nowrap; overflow: hidden; text-overflow: ellipsis; }
         .player-bar .pb-controls { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
         .player-bar .pb-controls button {
             background: none; border: none; cursor: pointer; padding: 4px;
@@ -216,51 +233,56 @@ const TEMPLATE = `<!DOCTYPE html>
         .player-bar .pb-controls button:hover { opacity: 0.7; }
         .player-bar .pb-controls svg { width: 22px; height: 22px; fill: currentColor; }
         .player-bar .pb-seek { display: flex; align-items: center; gap: 6px; flex: 1; max-width: 360px; min-width: 120px; }
-        .player-bar .pb-time { font-size: 0.7rem; color: #666; font-family: 'SF Mono', Monaco, monospace; white-space: nowrap; min-width: 32px; }
-        .dark .player-bar .pb-time { color: #aaa; }
+        .player-bar .pb-time { font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono); white-space: nowrap; min-width: 32px; }
         .player-bar input[type="range"] {
             -webkit-appearance: none; appearance: none; flex: 1; height: 4px;
-            background: #ccc; border-radius: 2px; outline: none; cursor: pointer;
+            background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
         }
-        .dark .player-bar input[type="range"] { background: #444; }
         .player-bar input[type="range"]::-webkit-slider-thumb {
             -webkit-appearance: none; width: 12px; height: 12px;
-            border-radius: 50%; background: #333; cursor: pointer;
+            border-radius: 50%; background: var(--accent); cursor: pointer;
         }
-        .dark .player-bar input[type="range"]::-webkit-slider-thumb { background: #ddd; }
+        .player-bar input[type="range"]::-moz-range-thumb {
+            width: 12px; height: 12px; border: none;
+            border-radius: 50%; background: var(--accent); cursor: pointer;
+        }
         .player-bar .pb-volume { display: flex; align-items: center; gap: 4px; flex-shrink: 0; }
         .player-bar .pb-volume button { background: none; border: none; cursor: pointer; padding: 2px; color: inherit; display: flex; }
         .player-bar .pb-volume button:hover { opacity: 0.7; }
         .player-bar .pb-volume svg { width: 18px; height: 18px; fill: currentColor; }
         .player-bar .pb-volume input[type="range"] { width: 60px; }
-        .playlist-item.active-track { background-color: #f0f4ff; }
-        .dark .playlist-item.active-track { background-color: #1a2233; }
+        .playlist-item.active-track { border-left-color: var(--accent); background-color: transparent; }
+        .playlist-item.active-track:hover { background-color: var(--surface); }
         @media (max-width: 768px) {
             .player-bar { flex-wrap: wrap; padding: 8px 12px; gap: 8px; }
             .player-bar .pb-thumb { width: 48px; height: 27px; }
             .player-bar .pb-seek { max-width: none; order: 10; width: 100%; }
             .player-bar .pb-volume input[type="range"] { width: 40px; }
         }
-        .timestamp { flex-shrink: 0; width: 128px; font-size: 0.75rem; color: #666; }
-        .dark .timestamp { color: #aaa; }
+        .timestamp { flex-shrink: 0; width: 128px; font-size: 0.85rem; color: var(--text-secondary); font-family: var(--font-mono); }
         .track-info { flex: 1; margin: 0 16px; }
-        .track-line { display: flex; align-items: baseline; gap: 8px; margin-bottom: 6px; flex-wrap: wrap; }
-        .track-title { font-size: 1.1rem; font-weight: 400; color: black; }
-        .dark .track-title { color: white; }
-        .artist-name { font-size: 1.1rem; font-weight: 300; color: #555; }
-        .dark .artist-name { color: #ccc; }
-        .release-year { font-size: 0.875rem; font-style: italic; color: #666; text-transform: none; }
-        .dark .release-year { color: #aaa; }
-        .show-dj-line { font-size: 0.9rem; font-weight: 400; color: #333; }
-        .dark .show-dj-line { color: #ddd; }
-        .dj-name { font-weight: 600; }
+        .track-title { font-family: var(--font-body); font-size: 1.25rem; font-weight: 500; color: var(--text); margin-bottom: 2px; }
+        .artist-name { font-family: var(--font-body); font-size: 1rem; font-weight: 300; color: var(--text-secondary); margin-bottom: 2px; }
+        .show-dj-line { font-family: var(--font-body); font-size: 0.9rem; font-weight: 400; color: var(--text-secondary); }
+        .dj-name { font-family: var(--font-body); font-weight: 600; }
         .show-name { font-weight: 400; }
-        .separator { color: #999; font-weight: 300; }
+        .separator { color: var(--text-secondary); font-weight: 300; }
         .album-covers { display: flex; gap: 8px; flex-shrink: 0; }
-        .album-cover-container { width: 64px; height: 64px; background-color: #f0f0f0; display: flex; align-items: center; justify-content: center; }
-        .dark .album-cover-container { background-color: #2a2a2a; }
-        .album-cover { width: 64px; height: 64px; object-fit: cover; opacity: 0; transition: opacity 0.2s; }
+        .album-cover-container { width: 80px; height: 80px; background-color: var(--surface); border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
+        .album-cover { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; opacity: 0; transition: opacity 0.2s; }
         .album-cover.loaded { opacity: 1; }
+        .origin-story {
+            margin-top: 48px; padding: 32px 0;
+            color: var(--text-secondary); font-size: 1rem; line-height: 1.7;
+        }
+        .origin-story h2 {
+            font-family: var(--font-title); font-size: 1.4rem; text-transform: uppercase;
+            color: var(--text); margin-bottom: 16px;
+        }
+        .origin-story p { margin-bottom: 12px; }
+        .origin-story p:last-child { margin-bottom: 0; }
+        .origin-story a { color: var(--accent); text-decoration: none; }
+        .origin-story a:hover { text-decoration: underline; }
         @media (max-width: 768px) {
             .container { padding: 15px; }
             .header { flex-direction: column; gap: 15px; }
@@ -269,14 +291,12 @@ const TEMPLATE = `<!DOCTYPE html>
             .track-number { width: 24px; margin-right: 12px; }
             .timestamp { width: 100px; font-size: 0.7rem; }
             .track-info { margin: 0 12px; min-width: 200px; }
-            .track-line { gap: 6px; margin-bottom: 4px; }
             .track-title { font-size: 1rem; }
-            .artist-name { font-size: 1rem; }
-            .release-year { font-size: 0.8rem; }
-            .show-dj-line { font-size: 0.85rem; gap: 6px; }
+            .artist-name { font-size: 0.9rem; }
+            .show-dj-line { font-size: 0.8rem; }
             .album-covers { gap: 6px; }
-            .album-cover-container { width: 48px; height: 48px; }
-            .album-cover { width: 48px; height: 48px; }
+            .album-cover-container { width: 56px; height: 56px; }
+            .album-cover { width: 56px; height: 56px; }
         }
     </style>
     <script src="https://www.youtube.com/iframe_api"></script>
@@ -297,18 +317,13 @@ const TEMPLATE = `<!DOCTYPE html>
         </header>
         <div class="status-info">{{STATUS_TEXT}}</div>
         <div class="filter-bar">
-            <label title="Include {{MISTAKE_COUNT}} entries that may be data errors">
+            <div class="dj-filters">{{DJ_OPTIONS}}</div>
+            <label class="show-mistakes" title="Include {{MISTAKE_COUNT}} entries that may be data errors">
                 <input type="checkbox" id="show-all" onchange="applyFilters()"{{SHOW_ALL_CHECKED}}>
                 Show mistakes
             </label>
-            <div class="dj-filters">{{DJ_OPTIONS}}</div>
         </div>
         <div id="player-bar" class="player-bar">
-            <img class="pb-thumb" id="pb-thumb" src="" alt="" style="visibility:hidden">
-            <div class="pb-info">
-                <div class="pb-title" id="pb-title">Select a track to play</div>
-                <div class="pb-artist" id="pb-artist"></div>
-            </div>
             <div class="pb-controls">
                 <button onclick="skipPrev()" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
                 <button onclick="togglePlay()" id="pb-play-btn" title="Play/Pause" style="position:relative;width:22px;height:22px"><svg viewBox="0 0 24 24" id="pb-play-icon" style="position:absolute;inset:0"><polygon points="5,3 19,12 5,21"/></svg><svg viewBox="0 0 24 24" id="pb-pause-icon" style="position:absolute;inset:0;display:none"><rect x="5" y="3" width="4" height="18"/><rect x="15" y="3" width="4" height="18"/></svg></button>
@@ -324,9 +339,21 @@ const TEMPLATE = `<!DOCTYPE html>
                 <button onclick="toggleMute()" id="pb-vol-btn" title="Mute"><svg viewBox="0 0 24 24" id="pb-vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg><svg viewBox="0 0 24 24" id="pb-mute-icon" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg></button>
                 <input type="range" id="pb-vol" min="0" max="100" value="100" step="1">
             </div>
+            <div class="pb-info">
+                <div class="pb-title" id="pb-title">&nbsp;</div>
+                <div class="pb-artist" id="pb-artist">&nbsp;</div>
+            </div>
+            <div class="pb-thumb" id="pb-thumb"></div>
         </div>
         <div id="yt-container" style="position:fixed;width:1px;height:1px;overflow:hidden;visibility:hidden;left:-9999px"><div id="yt-player"></div></div>
         <div class="playlist">{{DOUBLE_PLAYS_HTML}}</div>
+        <footer class="origin-story">
+            <h2>Origin Story</h2>
+            <p>I created this site because I noticed that sometimes when <a href="https://www.kexp.org/djs/john-richards/">John Richards</a> really likes a new song, he plays it twice in a row&mdash;just like a human would, on <a href="https://www.kexp.org">human-powered radio</a>. After catching him do this a few times, I started wondering if you could use the KEXP API to detect double plays automatically.</p>
+            <p>This was the first project I built with an AI coding agent. I initially used Cursor to create a TypeScript wrapper around the KEXP API, then later returned to it with <a href="https://claude.ai/claude-code">Claude Code</a>. I deployed the first double play monitor backend in late 2025 but didn't get around to building a frontend until recently.</p>
+            <p>The KEXP API only provides about one year of historical data, which means it doesn't include a few of my favorite double plays: <a href="https://www.youtube.com/watch?v=oiRWtw4YmaI">"No Liver, No Lungs"</a> by <a href="https://www.brimheim.com">Brimheim</a> and <a href="https://www.youtube.com/watch?v=vvPCm8cD6kw">"Bend"</a> by <a href="https://www.middlekidsmusic.com">Middle Kids</a>. Perhaps one day the API will go back further and we can hunt for more double plays.</p>
+            <p>Consider this a belated birthday gift to John Richards. Feel free to <a href="https://geoffreychallen.com">get in touch</a> if there are remote development opportunities at KEXP.</p>
+        </footer>
     </div>
     <script>
         function toggleTheme() {
@@ -383,6 +410,7 @@ const TEMPLATE = `<!DOCTYPE html>
                 yt: el.getAttribute('data-yt'),
                 title: el.getAttribute('data-title'),
                 artist: el.getAttribute('data-artist'),
+                album: el.getAttribute('data-album'),
                 djShow: el.getAttribute('data-dj-show'),
                 el: el
             });
@@ -440,9 +468,9 @@ const TEMPLATE = `<!DOCTYPE html>
             var bar = document.getElementById('player-bar');
             var idx = currentTrackIndex();
             if (idx < 0) {
-                document.getElementById('pb-thumb').style.visibility = 'hidden';
-                document.getElementById('pb-title').textContent = 'Select a track to play';
-                document.getElementById('pb-artist').textContent = '';
+                document.getElementById('pb-thumb').style.backgroundImage = '';
+                document.getElementById('pb-title').textContent = '\u00a0';
+                document.getElementById('pb-artist').textContent = '\u00a0';
                 document.getElementById('pb-play-icon').style.display = 'block';
                 document.getElementById('pb-pause-icon').style.display = 'none';
                 document.querySelectorAll('.playlist-item').forEach(function(el) { el.classList.remove('active-track'); });
@@ -454,10 +482,9 @@ const TEMPLATE = `<!DOCTYPE html>
                 return;
             }
             var t = tracks[idx];
-            document.getElementById('pb-thumb').style.visibility = 'visible';
-            document.getElementById('pb-thumb').src = 'https://img.youtube.com/vi/' + t.yt + '/mqdefault.jpg';
+            document.getElementById('pb-thumb').style.backgroundImage = 'url(https://img.youtube.com/vi/' + t.yt + '/mqdefault.jpg)';
             document.getElementById('pb-title').textContent = t.title;
-            document.getElementById('pb-artist').textContent = t.artist + (t.djShow ? ' \\u2022 ' + t.djShow : '');
+            document.getElementById('pb-artist').textContent = t.artist + (t.album ? ' \u2014 ' + t.album : '');
             // play/pause icons in bar
             document.getElementById('pb-play-icon').style.display = playing ? 'none' : 'block';
             document.getElementById('pb-pause-icon').style.display = playing ? 'block' : 'none';

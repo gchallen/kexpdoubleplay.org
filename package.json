@@ -13,7 +13,9 @@
     "build": "bun --filter=types build",
     "test": "bun --filter=worker test",
     "check": "cd types && bun run build && cd ../worker && npx tsc --noEmit -p tsconfig.json",
-    "tail": "cd worker && wrangler tail"
+    "ncu": "bunx npm-check-updates --deep",
+    "tail": "cd worker && wrangler tail",
+    "sync-db": "bash scripts/sync-db.sh"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner"],
   "author": "",
