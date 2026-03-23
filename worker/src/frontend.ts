@@ -81,7 +81,7 @@ export async function renderFrontend(
   return new Response(html, {
     headers: {
       "Content-Type": "text/html;charset=UTF-8",
-      "Cache-Control": "no-cache, must-revalidate",
+      "Cache-Control": "public, max-age=300",
     },
   });
 }
