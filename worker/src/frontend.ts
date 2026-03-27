@@ -54,6 +54,15 @@ export async function renderFrontend(
 
   const statusText = `Last updated: <span class="timestamp" data-ts="${lastFetch || ""}"></span>`;
 
+  // Days since last double play
+  const lastPlayTs = doublePlays.length > 0 ? doublePlays[0].plays[0].timestamp : null;
+  const daysSinceLast = lastPlayTs
+    ? Math.floor((Date.now() - new Date(lastPlayTs).getTime()) / (1000 * 60 * 60 * 24))
+    : null;
+  const daysSinceText = daysSinceLast !== null
+    ? `${daysSinceLast} day${daysSinceLast === 1 ? "" : "s"} since the last double play`
+    : "";
+
   // Build DJ checkboxes
   const djOptions = djList
     .map(([dj, count]) => {
@@ -74,6 +83,7 @@ export async function renderFrontend(
     .replace("{{SUN_DISPLAY}}", sunDisplay)
     .replace("{{MOON_DISPLAY}}", moonDisplay)
     .replace("{{STATUS_TEXT}}", statusText)
+    .replace("{{DAYS_SINCE}}", daysSinceText)
     .replace("{{DJ_OPTIONS}}", djOptions)
     .replace("{{YT_PLAYLIST_URL}}", ytPlaylistUrl)
     .replace("{{DOUBLE_PLAYS_HTML}}", items);
@@ -204,7 +214,7 @@ const TEMPLATE = `<!DOCTYPE html>
         .tagline a { color: var(--accent); text-decoration: none; }
         .tagline a:hover { text-decoration: underline; }
         .theme-icon { width: 20px; height: 20px; fill: none; stroke: currentColor; stroke-width: 2; stroke-linecap: round; stroke-linejoin: round; }
-        .status-info { margin-bottom: 12px; font-size: 0.85rem; color: var(--text-secondary); text-align: right; }
+        .status-info { margin-bottom: 12px; font-size: 0.85rem; color: var(--text-secondary); display: flex; justify-content: space-between; align-items: baseline; }
         .status-info .timestamp { font-family: var(--font-body); font-size: inherit; width: auto; }
         .filter-bar { display: flex; align-items: flex-start; gap: 16px; margin-bottom: 12px; flex-wrap: wrap; }
         .dj-filters { display: flex; flex-wrap: wrap; gap: 6px; }
@@ -353,7 +363,7 @@ const TEMPLATE = `<!DOCTYPE html>
             <div class="dj-filters">{{DJ_OPTIONS}}</div>
             <a class="yt-playlist-btn" href="{{YT_PLAYLIST_URL}}" target="_blank" title="Open playlist in YouTube"><svg viewBox="0 0 24 24" width="16" height="16" fill="currentColor"><path d="M21.58 7.19c-.23-.86-.91-1.54-1.77-1.77C18.25 5 12 5 12 5s-6.25 0-7.81.42c-.86.23-1.54.91-1.77 1.77C2 8.75 2 12 2 12s0 3.25.42 4.81c.23.86.91 1.54 1.77 1.77C5.75 19 12 19 12 19s6.25 0 7.81-.42c.86-.23 1.54-.91 1.77-1.77C22 15.25 22 12 22 12s0-3.25-.42-4.81zM10 15V9l5.2 3-5.2 3z"/></svg> Open on YouTube</a>
         </div>
-        <div class="status-info">{{STATUS_TEXT}}</div>
+        <div class="status-info"><span>{{DAYS_SINCE}}</span><span>{{STATUS_TEXT}}</span></div>
         <div id="player-bar" class="player-bar">
             <div class="pb-controls">
                 <button onclick="skipPrev()" title="Previous"><svg viewBox="0 0 24 24"><path d="M6 6h2v12H6zm3.5 6l8.5 6V6z"/></svg></button>
