@@ -51,6 +51,8 @@ bun run check            # TypeScript check
 cd worker && bun run tail # Stream live logs
 ```
 
+In development, the site is served at **`http://kexpdoubleplays.local`** (reverse-proxied to wrangler dev). Use that hostname — not `localhost:8788` — when fetching or testing the local site.
+
 ### Configuration
 Environment variables in `worker/wrangler.toml`:
 - `NTFY_TOPIC`: ntfy.sh topic for push notifications
