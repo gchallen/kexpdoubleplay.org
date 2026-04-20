@@ -15,7 +15,11 @@
     "check": "cd types && bun run build && cd ../worker && npx tsc --noEmit -p tsconfig.json",
     "ncu": "bunx npm-check-updates --deep",
     "tail": "cd worker && wrangler tail",
-    "sync-db": "bash scripts/sync-db.sh"
+    "db:sync": "bash scripts/sync-db.sh",
+    "youtube:update": "bun run scripts/update-youtube.ts"
+  },
+  "devDependencies": {
+    "puppeteer": "24.42.0"
   },
   "keywords": ["kexp", "radio", "double-play", "scanner"],
   "author": "",
