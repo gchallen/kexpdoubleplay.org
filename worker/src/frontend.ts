@@ -115,9 +115,13 @@ function renderItem(dp: DoublePlay, i: number): string {
   const coverUri = dp.youtube_id
     ? `https://img.youtube.com/vi/${dp.youtube_id}/mqdefault.jpg`
     : dp.plays.find((p) => p.kexpPlay.image_uri)?.kexpPlay.image_uri;
-  const cover = coverUri
-    ? `<div class="album-cover-container"><img src="${coverUri}" alt="Album cover" class="album-cover" loading="lazy"></div>`
-    : "";
+  let cover = "";
+  if (coverUri) {
+    const img = `<img src="${coverUri}" alt="Album cover" class="album-cover" loading="lazy">`;
+    cover = dp.youtube_id
+      ? `<a class="album-cover-container album-cover-link" href="https://www.youtube.com/watch?v=${dp.youtube_id}" target="_blank" rel="noopener noreferrer" title="Watch on YouTube" onclick="pauseForExternalYT()">${img}</a>`
+      : `<div class="album-cover-container">${img}</div>`;
+  }
 
   const ytAttr = dp.youtube_id ? ` data-yt="${dp.youtube_id}"` : "";
   const djShow = [dp.dj, dp.show].filter(Boolean).join(" \u2022 ");
@@ -125,7 +129,14 @@ function renderItem(dp: DoublePlay, i: number): string {
   const newClass = dp.youtube_id ? "" : " new-track";
   const newBadge = dp.youtube_id ? "" : `<span class="new-badge">New</span>`;
 
-  return `<div class="playlist-item${newClass}"${ytAttr} data-title="${escAttr(dp.title)}" data-artist="${escAttr(dp.artist)}" data-album="${escAttr(album)}" data-dj-show="${escAttr(djShow)}">
+  // Per-track duration: take the max of KEXP-reported play durations >= 30s, else 0.
+  // KEXP values under 30s are measurement artifacts (gap between plays, not song length).
+  const validDurations = dp.plays
+    .map((p) => p.duration)
+    .filter((d): d is number => typeof d === "number" && d >= 30);
+  const duration = validDurations.length ? Math.max(...validDurations) : 0;
+
+  return `<div class="playlist-item${newClass}"${ytAttr} data-duration="${duration}" data-title="${escAttr(dp.title)}" data-artist="${escAttr(dp.artist)}" data-album="${escAttr(album)}" data-dj-show="${escAttr(djShow)}">
   <div class="item-content">
     <div class="track-number">${i}</div>
     ${playBtn}
@@ -266,6 +277,8 @@ const TEMPLATE = `<!DOCTYPE html>
         .player-bar .pb-controls svg { width: 22px; height: 22px; fill: currentColor; }
         .player-bar .pb-seek { display: flex; align-items: center; gap: 6px; flex: 1; max-width: 360px; min-width: 120px; }
         .player-bar .pb-time { font-size: 0.8rem; color: var(--text-secondary); font-family: var(--font-mono); white-space: nowrap; min-width: 32px; }
+        .player-bar .pb-time-stack { display: flex; flex-direction: column; align-items: center; line-height: 1.1; }
+        .player-bar .pb-time-sub { font-size: 0.65rem; opacity: 0.6; }
         .player-bar input[type="range"] {
             -webkit-appearance: none; appearance: none; flex: 1; height: 4px;
             background: var(--border); border-radius: 2px; outline: none; cursor: pointer;
@@ -306,6 +319,8 @@ const TEMPLATE = `<!DOCTYPE html>
         .show-name { font-weight: 400; }
         .separator { color: var(--text-secondary); font-weight: 300; }
         .album-covers { display: flex; gap: 8px; flex-shrink: 0; }
+        .album-cover-link { display: block; cursor: pointer; transition: filter 0.15s; }
+        .album-cover-link:hover { filter: brightness(1.08); }
         .album-cover-container { width: 80px; height: 80px; background-color: var(--surface); border-radius: 4px; display: flex; align-items: center; justify-content: center; overflow: hidden; }
         .album-cover { width: 80px; height: 80px; object-fit: cover; border-radius: 4px; opacity: 0; transition: opacity 0.2s; }
         .album-cover.loaded { opacity: 1; }
@@ -372,9 +387,15 @@ const TEMPLATE = `<!DOCTYPE html>
                 <button onclick="toggleShuffle()" id="pb-shuffle-btn" title="Shuffle" style="opacity:0.4"><svg viewBox="0 0 24 24"><path d="M10.59 9.17L5.41 4 4 5.41l5.17 5.17 1.42-1.41zM14.5 4l2.04 2.04L4 18.59 5.41 20 17.96 7.46 20 9.5V4h-5.5zm.33 9.41l-1.41 1.41 3.13 3.13L14.5 20H20v-5.5l-2.04 2.04-3.13-3.13z"/></svg></button>
             </div>
             <div class="pb-seek">
-                <span class="pb-time" id="pb-cur">0:00</span>
+                <span class="pb-time pb-time-stack">
+                    <span class="pb-time-main" id="pb-cur">0:00</span>
+                    <span class="pb-time-sub" id="pb-cur-playlist">0:00</span>
+                </span>
                 <input type="range" id="pb-seek" min="0" max="100" value="0" step="0.1">
-                <span class="pb-time" id="pb-dur">0:00</span>
+                <span class="pb-time pb-time-stack">
+                    <span class="pb-time-main" id="pb-dur">0:00</span>
+                    <span class="pb-time-sub" id="pb-dur-playlist">0:00</span>
+                </span>
             </div>
             <div class="pb-volume">
                 <button onclick="toggleMute()" id="pb-vol-btn" title="Mute"><svg viewBox="0 0 24 24" id="pb-vol-icon"><path d="M3 9v6h4l5 5V4L7 9H3zm13.5 3c0-1.77-1.02-3.29-2.5-4.03v8.05c1.48-.73 2.5-2.25 2.5-4.02z"/></svg><svg viewBox="0 0 24 24" id="pb-mute-icon" style="display:none"><path d="M16.5 12c0-1.77-1.02-3.29-2.5-4.03v2.21l2.45 2.45c.03-.2.05-.41.05-.63zm2.5 0c0 .94-.2 1.82-.54 2.64l1.51 1.51C20.63 14.91 21 13.5 21 12c0-4.28-2.99-7.86-7-8.77v2.06c2.89.86 5 3.54 5 6.71zM4.27 3L3 4.27 7.73 9H3v6h4l5 5v-6.73l4.25 4.25c-.67.52-1.42.93-2.25 1.18v2.06c1.38-.31 2.63-.95 3.69-1.81L19.73 21 21 19.73l-9-9L4.27 3zM12 4L9.91 6.09 12 8.18V4z"/></svg></button>
@@ -452,9 +473,30 @@ const TEMPLATE = `<!DOCTYPE html>
                 artist: el.getAttribute('data-artist'),
                 album: el.getAttribute('data-album'),
                 djShow: el.getAttribute('data-dj-show'),
+                duration: parseInt(el.getAttribute('data-duration') || '0', 10) || 0,
                 el: el
             });
         });
+
+        var totalPlaylistDuration = tracks.reduce(function(sum, t) { return sum + t.duration; }, 0);
+
+        function computePlaylistElapsed(currentTrackTime) {
+            var idx = currentTrackIndex();
+            if (idx < 0) return 0;
+            var elapsed = 0;
+            for (var i = 0; i < idx; i++) elapsed += tracks[i].duration;
+            elapsed += currentTrackTime || 0;
+            return elapsed;
+        }
+
+        function renderPlaylistTimes(currentTrackTime) {
+            document.getElementById('pb-cur-playlist').textContent = fmtTime(computePlaylistElapsed(currentTrackTime));
+            document.getElementById('pb-dur-playlist').textContent = fmtTime(totalPlaylistDuration);
+        }
+
+        function pauseForExternalYT() {
+            if (ytPlayer && playing) ytPlayer.pauseVideo();
+        }
 
         // Fisher-Yates shuffle
         function generateShuffleOrder() {
@@ -507,6 +549,7 @@ const TEMPLATE = `<!DOCTYPE html>
         function updateBarUI() {
             var bar = document.getElementById('player-bar');
             var idx = currentTrackIndex();
+            renderPlaylistTimes(0);
             if (idx < 0) {
                 document.getElementById('pb-thumb').style.backgroundImage = '';
                 document.getElementById('pb-title').textContent = '\u00a0';
@@ -560,6 +603,7 @@ const TEMPLATE = `<!DOCTYPE html>
                 document.getElementById('pb-dur').textContent = fmtTime(duration);
                 var seek = document.getElementById('pb-seek');
                 if (duration > 0) seek.value = (t / duration * 100).toString();
+                renderPlaylistTimes(t);
             }, 500);
         }
 
@@ -662,6 +706,9 @@ const TEMPLATE = `<!DOCTYPE html>
                 playTrack(this.getAttribute('data-yt'));
             });
         });
+
+        // Initial playlist time display (total shown immediately; elapsed=0)
+        renderPlaylistTimes(0);
 
         // YouTube IFrame API ready callback
         function onYouTubeIframeAPIReady() {
